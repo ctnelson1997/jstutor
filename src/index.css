@@ -1,0 +1,216 @@
+:root {
+  --console-bg: #1e1e1e;
+  --console-fg: #d4d4d4;
+}
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Main layout fills remaining space below navbar */
+.main-layout {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-layout > .row {
+  height: 100%;
+}
+
+/* Editor column */
+.editor-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Visualization column */
+.viz-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Scrollable visualization area */
+.viz-scroll {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+/* Console panel — vertically resizable */
+.console-panel-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 60px;
+  max-height: 60vh;
+  height: 150px;
+  border-top: 1px solid #444;
+  overflow: hidden;
+}
+
+.console-resize-handle {
+  height: 5px;
+  cursor: ns-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.console-resize-handle:hover,
+.console-resize-handle.active {
+  background: rgba(100, 149, 237, 0.5);
+}
+
+.console-panel {
+  background: var(--console-bg);
+  color: var(--console-fg);
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.console-panel .log-warn {
+  color: #e6db74;
+}
+
+.console-panel .log-error {
+  color: #f44747;
+}
+
+/* Toast fade duration override */
+.toast.fade {
+  transition: opacity 0.5s ease !important;
+}
+
+/* CodeMirror fill parent */
+.cm-editor {
+  height: 100% !important;
+}
+
+.cm-scroller {
+  overflow: auto !important;
+  min-height: 100% !important;
+}
+
+/* Make the gutter background extend to fill the full editor height */
+.cm-editor .cm-gutters {
+  min-height: 100% !important;
+}
+
+/* Current line highlight in editor */
+.cm-current-step-line {
+  background-color: rgba(255, 255, 100, 0.25) !important;
+}
+
+/* Frame cards */
+.frame-card {
+  font-size: 0.85rem;
+}
+
+.frame-card .card-header {
+  font-weight: 600;
+  padding: 0.3rem 0.6rem;
+}
+
+.frame-card .card-body {
+  padding: 0.3rem 0.6rem;
+}
+
+.frame-card table {
+  margin-bottom: 0;
+}
+
+.frame-card td {
+  padding: 0.15rem 0.4rem;
+  vertical-align: middle;
+}
+
+/* Heap object cards */
+.heap-card {
+  font-size: 0.8rem;
+  min-width: 110px;
+}
+
+.heap-card .card-header {
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.heap-card .card-body {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Array cells */
+.array-cells {
+  display: flex;
+  gap: 0;
+}
+
+.array-cell {
+  border: 1px solid #aaa;
+  padding: 0.15rem 0.4rem;
+  text-align: center;
+  min-width: 32px;
+  font-size: 0.8rem;
+}
+
+.array-cell .cell-index {
+  font-size: 0.6rem;
+  color: #888;
+  display: block;
+  line-height: 1;
+}
+
+/* Ref dot (arrow source) */
+.ref-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #0d6efd;
+  cursor: default;
+}
+
+/* Control bar */
+.control-bar {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.step-slider {
+  width: 100%;
+}
+
+/* Warning page */
+.warning-page {
+  max-width: 800px;
+  margin: 3rem auto;
+}
+
+/* Responsive: stack columns on small screens */
+@media (max-width: 991px) {
+  .main-layout > .row {
+    height: auto;
+    overflow: auto;
+  }
+  .editor-column,
+  .viz-column {
+    height: 50vh;
+  }
+}
