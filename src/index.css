@@ -18,10 +18,22 @@ html, body, #root {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: row;
 }
 
-.main-layout > .row {
-  height: 100%;
+/* Draggable split divider */
+.split-divider {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: #dee2e6;
+  transition: background 0.15s;
+}
+
+.split-divider:hover,
+.split-divider:active {
+  background: rgba(100, 149, 237, 0.6);
 }
 
 /* Editor column */
@@ -222,12 +234,18 @@ html, body, #root {
 
 /* Responsive: stack columns on small screens */
 @media (max-width: 991px) {
-  .main-layout > .row {
-    height: auto;
+  .main-layout {
+    flex-direction: column;
     overflow: auto;
   }
   .editor-column,
   .viz-column {
+    width: 100% !important;
     height: 50vh;
+  }
+  .split-divider {
+    width: 100%;
+    height: 5px;
+    cursor: ns-resize;
   }
 }

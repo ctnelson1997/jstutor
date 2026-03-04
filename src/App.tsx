@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Container, Row, Col, Toast, ToastContainer, Button } from 'react-bootstrap';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Toast, ToastContainer, Button } from 'react-bootstrap';
 import AppNavbar from './components/AppNavbar';
 import EditorPanel from './components/EditorPanel';
 import VisualizationPanel from './components/VisualizationPanel';
@@ -13,6 +13,31 @@ export default function App() {
 
   const shouldShowToast = localStorage.getItem('jstutor-hide-warning') !== 'true';
   const [showToast, setShowToast] = useState(false);
+
+  // Resizable split
+  const [splitPercent, setSplitPercent] = useState(40);
+  const dragging = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    dragging.current = true;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    setSplitPercent(Math.min(80, Math.max(20, pct)));
+  }, []);
+
+  const onPointerUp = useCallback(() => {
+    dragging.current = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }, []);
 
   // Delay showing toast so it mounts hidden first, then fades in
   useEffect(() => {
@@ -55,16 +80,23 @@ export default function App() {
   return (
     <>
       <AppNavbar />
-      <Container fluid className="main-layout px-0">
-        <Row className="g-0">
-          <Col lg={5} className="editor-column border-end">
-            <EditorPanel />
-          </Col>
-          <Col lg={7} className="viz-column">
-            <VisualizationPanel />
-          </Col>
-        </Row>
-      </Container>
+      <div
+        className="main-layout"
+        ref={containerRef}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        <div className="editor-column border-end" style={{ width: `${splitPercent}%` }}>
+          <EditorPanel />
+        </div>
+        <div
+          className="split-divider"
+          onPointerDown={onPointerDown}
+        />
+        <div className="viz-column" style={{ width: `${100 - splitPercent}%` }}>
+          <VisualizationPanel />
+        </div>
+      </div>
 
       <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>
         <Toast show={showToast} onClose={() => setShowToast(false)} animation>
