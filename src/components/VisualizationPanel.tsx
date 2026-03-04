@@ -1,16 +1,19 @@
+import { useRef } from 'react';
 import ControlBar from './ControlBar';
 import FramesView from './FramesView';
 import HeapView from './HeapView';
 import ConsolePanel from './ConsolePanel';
+import PointerArrows from './PointerArrows';
 import { useStore } from '../store/useStore';
 
 export default function VisualizationPanel() {
   const snapshots = useStore((s) => s.snapshots);
+  const vizRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="d-flex flex-column h-100">
       <ControlBar />
-      <div className="viz-scroll p-2">
+      <div className="viz-scroll p-2" ref={vizRef} style={{ position: 'relative' }}>
         {snapshots.length === 0 ? (
           <div className="text-center text-muted mt-5">
             <h5>Memory Visualization</h5>
@@ -30,6 +33,7 @@ export default function VisualizationPanel() {
               </h6>
               <HeapView />
             </div>
+            <PointerArrows containerRef={vizRef} />
           </div>
         )}
       </div>
