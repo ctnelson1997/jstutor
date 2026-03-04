@@ -6,6 +6,6 @@ export default defineConfig({
   plugins: [react()],
   base: '/jstutor/',
   build: {
-    outDir: 'dist',
+    outDir: 'docs',
   },
 })
