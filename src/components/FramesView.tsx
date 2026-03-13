@@ -56,16 +56,25 @@ function FrameCard({ frame, index }: { frame: StackFrame; index: number }) {
         ) : (
           <table className="w-100">
             <tbody>
-              {frame.variables.map((v) => (
-                <tr key={v.name}>
-                  <td className="fw-semibold" style={{ fontFamily: 'monospace' }}>
-                    {v.name}
-                  </td>
-                  <td className="text-end">
-                    <ValueDisplay value={v.value} />
-                  </td>
-                </tr>
-              ))}
+              {frame.variables.map((v) => {
+                const isReturn = v.name === 'return \u21b5';
+                return (
+                  <tr key={v.name} style={isReturn ? { borderTop: '1px dashed #0d6efd' } : undefined}>
+                    <td
+                      className="fw-semibold"
+                      style={{
+                        fontFamily: 'monospace',
+                        ...(isReturn ? { color: '#0d6efd', fontStyle: 'italic' } : {}),
+                      }}
+                    >
+                      {v.name}
+                    </td>
+                    <td className="text-end">
+                      <ValueDisplay value={v.value} />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

@@ -27,6 +27,7 @@ var __snapshots__ = [];
 var __stdout__ = [];
 var __callStack__ = [{ name: "Global", variables: {} }];
 var __heapMap__ = new Map();  // object identity → heap ID
+var __heapRegistry__ = {};   // heapId → most recent serialized HeapObject
 var __heapCounter__ = 0;
 var __MAX_SNAPSHOTS = 5000;
 
@@ -146,12 +147,43 @@ function __serializeHeapObject__(obj, heapId, heapObjects, visited) {
     }
   }
 
-  return {
+  var heapObj = {
     id: heapId,
     objectType: objectType,
     label: label,
     properties: properties
   };
+  __heapRegistry__[heapId] = heapObj;
+  return heapObj;
+}
+
+// ── Heap collection ──
+
+// Walk all frames in a stack snapshot and collect every referenced
+// HeapObject (transitively through object properties) from the registry.
+function __collectHeap__(stackSnapshot) {
+  var seen = {};
+  var result = [];
+  function visit(val) {
+    if (!val || val.type !== "ref") return;
+    if (seen[val.heapId]) return;
+    seen[val.heapId] = true;
+    var obj = __heapRegistry__[val.heapId];
+    if (obj) {
+      result.push(obj);
+      for (var p = 0; p < obj.properties.length; p++) {
+        visit(obj.properties[p].value);
+      }
+    }
+  }
+  for (var f = 0; f < stackSnapshot.length; f++) {
+    var vars = stackSnapshot[f].variables;
+    if (!vars || !vars.length) continue;
+    for (var v = 0; v < vars.length; v++) {
+      visit(vars[v].value);
+    }
+  }
+  return result;
 }
 
 // ── Capture ──
@@ -227,7 +259,7 @@ function __capture__(line, vars, parentVarNames) {
     step: __snapshots__.length,
     line: line,
     callStack: stackSnapshot,
-    heap: heapObjects,
+    heap: __collectHeap__(stackSnapshot),
     stdout: __stdout__.slice()
   });
 }
@@ -256,10 +288,41 @@ function __pushFrame__(name, params) {
   __callStack__.push(frame);
 }
 
-function __popFrame__() {
+function __popFrame__(retVal, line) {
   if (__callStack__.length > 1) {
+    // Emit a snapshot showing the return value before popping the frame
+    if (line !== undefined && __snapshots__.length < __MAX_SNAPSHOTS) {
+      var heapObjects = [];
+      var visited = new Set();
+      var topFrame = __callStack__[__callStack__.length - 1];
+
+      // Copy existing variables and append the return value
+      var retVars = (topFrame.variables || []).slice();
+      retVars.push({
+        name: "return \u21b5",
+        value: __serializeValue__(retVal, heapObjects, visited)
+      });
+
+      var stackSnapshot = [];
+      for (var j = 0; j < __callStack__.length; j++) {
+        var frame = __callStack__[j];
+        stackSnapshot.push({
+          name: frame.name,
+          variables: j === __callStack__.length - 1 ? retVars : (frame.variables || [])
+        });
+      }
+      __snapshots__.push({
+        step: __snapshots__.length,
+        line: line,
+        callStack: stackSnapshot,
+        heap: __collectHeap__(stackSnapshot),
+        stdout: __stdout__.slice()
+      });
+    }
+
     __callStack__.pop();
   }
+  return retVal;
 }
 
 // ── Console capture ──

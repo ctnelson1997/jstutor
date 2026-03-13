@@ -281,8 +281,12 @@ function instrumentBlock(
     // Pass the full set of vars visible at this point
     instrumentStatement(stmt, declaredSoFar);
 
-    // Insert __capture__ after this statement (for most statement types)
-    if (shouldCaptureAfter(stmt)) {
+    // For return/throw, insert capture BEFORE (capture after is dead code)
+    if (stmt.type === 'ReturnStatement' || stmt.type === 'ThrowStatement') {
+      const capture = buildCaptureExpression(declaredSoFar, line);
+      body.splice(i, 0, capture);
+      i += 2; // skip past inserted capture + the statement
+    } else if (shouldCaptureAfter(stmt)) {
       const capture = buildCaptureExpression(declaredSoFar, line);
       body.splice(i + 1, 0, capture);
       i += 2; // skip past the original statement + inserted capture
@@ -299,10 +303,12 @@ function shouldCaptureAfter(stmt: AnyNode): boolean {
   switch (stmt.type) {
     case 'VariableDeclaration':
     case 'ExpressionStatement':
-    case 'ReturnStatement':
-    case 'ThrowStatement':
     case 'AssignmentExpression':
       return true;
+    case 'ReturnStatement':
+    case 'ThrowStatement':
+      // Handled separately — capture is inserted BEFORE these (not after)
+      return false;
     case 'IfStatement':
     case 'ForStatement':
     case 'ForInStatement':
@@ -335,14 +341,19 @@ function instrumentStatement(stmt: AnyNode, scopeVars: string[]): void {
       break;
 
     case 'IfStatement':
-      if (stmt.consequent.type === 'BlockStatement') {
-        instrumentBlock(stmt.consequent.body, scopeVars, false);
+      // Wrap bare (non-block) branches so captures and popFrames work inside them
+      if (stmt.consequent.type !== 'BlockStatement') {
+        stmt.consequent = { type: 'BlockStatement', body: [stmt.consequent] };
       }
+      instrumentBlock(stmt.consequent.body, scopeVars, false);
       if (stmt.alternate) {
-        if (stmt.alternate.type === 'BlockStatement') {
-          instrumentBlock(stmt.alternate.body, scopeVars, false);
-        } else if (stmt.alternate.type === 'IfStatement') {
+        if (stmt.alternate.type === 'IfStatement') {
           instrumentStatement(stmt.alternate, scopeVars);
+        } else {
+          if (stmt.alternate.type !== 'BlockStatement') {
+            stmt.alternate = { type: 'BlockStatement', body: [stmt.alternate] };
+          }
+          instrumentBlock(stmt.alternate.body, scopeVars, false);
         }
       }
       break;
@@ -507,14 +518,16 @@ function instrumentFunction(fn: AnyNode, _parentVars: string[]): void {
   // discovered incrementally by instrumentBlock to avoid TDZ errors.
   const fnScopeVars = [...paramNames];
 
-  // Instrument body statements
-  instrumentBlock(body, fnScopeVars, false);
+  // Instrument body statements (pass isTopLevel=true so an initial capture
+  // is emitted — instrumentFunction then prepends __pushFrame__ before it,
+  // giving us a snapshot on function entry)
+  instrumentBlock(body, fnScopeVars, true);
 
   // Insert __pushFrame__ at the beginning of the function body
   body.unshift(buildPushFrame(name, paramNames));
 
-  // Insert __popFrame__ before every return statement and at the end
-  insertPopFrameBeforeReturns(body);
+  // Wrap return values so the frame pops AFTER the expression evaluates
+  wrapReturnsWithPopFrame(body);
 
   // Add __popFrame__ at the very end (for functions that fall through)
   body.push(buildPopFrame());
@@ -523,27 +536,48 @@ function instrumentFunction(fn: AnyNode, _parentVars: string[]): void {
 }
 
 /**
- * Insert __popFrame__() before each ReturnStatement in a body.
+ * Wrap every ReturnStatement's argument so the frame pops AFTER the
+ * return expression is evaluated:
+ *   return expr  →  return __popFrame__(expr, line)
+ *   return       →  return __popFrame__(undefined, line)
+ *
+ * The line number lets __popFrame__ emit a snapshot showing the return
+ * value before the frame is removed from the call stack.
  */
-function insertPopFrameBeforeReturns(body: AnyNode[]): void {
-  let i = 0;
-  while (i < body.length) {
+function wrapReturnsWithPopFrame(body: AnyNode[]): void {
+  for (let i = 0; i < body.length; i++) {
     const stmt = body[i];
     if (stmt.type === 'ReturnStatement') {
-      body.splice(i, 0, buildPopFrame());
-      i += 2; // skip pop + return
+      const line = stmt.loc?.start?.line ?? 0;
+      const retArg = stmt.argument
+        ? stmt.argument
+        : { type: 'Identifier', name: 'undefined' };
+      stmt.argument = {
+        type: 'CallExpression',
+        callee: { type: 'Identifier', name: '__popFrame__' },
+        arguments: [retArg, { type: 'Literal', value: line }],
+        optional: false,
+      };
     } else {
-      // Recurse into blocks
-      if (stmt.type === 'IfStatement') {
-        if (stmt.consequent?.type === 'BlockStatement') {
-          insertPopFrameBeforeReturns(stmt.consequent.body);
-        }
-        if (stmt.alternate?.type === 'BlockStatement') {
-          insertPopFrameBeforeReturns(stmt.alternate.body);
-        }
-      }
-      i += 1;
+      wrapReturnsInBranches(stmt);
     }
+  }
+}
+
+/**
+ * Recurse into branch-bearing statements (if/else) to find
+ * ReturnStatements nested inside blocks.
+ */
+function wrapReturnsInBranches(stmt: AnyNode): void {
+  if (stmt.type !== 'IfStatement') return;
+
+  if (stmt.consequent?.type === 'BlockStatement') {
+    wrapReturnsWithPopFrame(stmt.consequent.body);
+  }
+  if (stmt.alternate?.type === 'BlockStatement') {
+    wrapReturnsWithPopFrame(stmt.alternate.body);
+  } else if (stmt.alternate?.type === 'IfStatement') {
+    wrapReturnsInBranches(stmt.alternate);
   }
 }
 

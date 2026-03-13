@@ -1,6 +1,7 @@
-import { Card } from 'react-bootstrap';
+import { useState, useMemo } from 'react';
+import { Card, ButtonGroup, Button } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
-import type { HeapObject, RuntimeValue } from '../types/snapshot';
+import type { HeapObject, RuntimeValue, StackFrame } from '../types/snapshot';
 
 function ValueDisplay({ value }: { value: RuntimeValue }) {
   if (value.type === 'ref') {
@@ -127,22 +128,69 @@ function HeapCard({ obj }: { obj: HeapObject }) {
   );
 }
 
+type HeapFilter = 'all' | 'current';
+
+/** Collect heap IDs directly referenced by a frame's variables. */
+function refsInFrame(frame: StackFrame): Set<string> {
+  const ids = new Set<string>();
+  for (const v of frame.variables) {
+    if (v.value.type === 'ref') ids.add(v.value.heapId);
+  }
+  return ids;
+}
+
 export default function HeapView() {
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
-
-  if (snapshots.length === 0) return null;
+  const [filter, setFilter] = useState<HeapFilter>('all');
 
   const snapshot = snapshots[currentStep];
+
+  const visibleObjects = useMemo(() => {
+    if (!snapshot || snapshot.heap.length === 0) return [];
+    if (filter === 'all') return snapshot.heap;
+
+    // "current" — only objects referenced by the top (most recent) frame
+    const topFrame = snapshot.callStack[snapshot.callStack.length - 1];
+    if (!topFrame) return snapshot.heap;
+    const topRefs = refsInFrame(topFrame);
+    return snapshot.heap.filter((obj) => topRefs.has(obj.id));
+  }, [snapshot, filter]);
+
+  if (snapshots.length === 0) return null;
   if (!snapshot || snapshot.heap.length === 0) {
     return <div className="text-muted" style={{ fontSize: '0.85rem' }}>No heap objects</div>;
   }
 
   return (
-    <div className="d-flex flex-wrap gap-2">
-      {snapshot.heap.map((obj) => (
-        <HeapCard key={obj.id} obj={obj} />
-      ))}
+    <div>
+      <ButtonGroup size="sm" className="mb-2">
+        <Button
+          variant={filter === 'all' ? 'primary' : 'outline-primary'}
+          onClick={() => setFilter('all')}
+          style={{ fontSize: '0.7rem' }}
+        >
+          All frames
+        </Button>
+        <Button
+          variant={filter === 'current' ? 'primary' : 'outline-primary'}
+          onClick={() => setFilter('current')}
+          style={{ fontSize: '0.7rem' }}
+        >
+          Current frame
+        </Button>
+      </ButtonGroup>
+      {visibleObjects.length === 0 ? (
+        <div className="text-muted" style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
+          No objects in this frame
+        </div>
+      ) : (
+        <div className="d-flex flex-wrap gap-2">
+          {visibleObjects.map((obj) => (
+            <HeapCard key={obj.id} obj={obj} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

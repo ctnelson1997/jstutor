@@ -156,6 +156,12 @@ html, body, #root {
 .heap-card {
   font-size: 0.8rem;
   min-width: 110px;
+  animation: heapFadeIn 0.25s ease-out;
+}
+
+@keyframes heapFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .heap-card .card-header {

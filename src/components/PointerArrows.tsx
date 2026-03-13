@@ -97,14 +97,22 @@ export default function PointerArrows({ containerRef }: { containerRef: React.Re
     return () => cancelAnimationFrame(raf);
   }, [draw, currentStep, snapshots]);
 
-  // Redraw on resize and scroll
+  // Redraw on resize, scroll, and DOM mutations (e.g. heap filter toggling cards)
   useEffect(() => {
     const container = containerRef.current;
     window.addEventListener('resize', draw);
     container?.addEventListener('scroll', draw);
+
+    let observer: MutationObserver | undefined;
+    if (container) {
+      observer = new MutationObserver(() => requestAnimationFrame(draw));
+      observer.observe(container, { childList: true, subtree: true });
+    }
+
     return () => {
       window.removeEventListener('resize', draw);
       container?.removeEventListener('scroll', draw);
+      observer?.disconnect();
     };
   }, [draw, containerRef]);
 
