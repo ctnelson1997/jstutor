@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \":*)",
+      "Bash(npx vite:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node --import tsx -e \":*)",
+      "Bash(npx tsx -e \":*)",
+      "Bash(npm uninstall:*)"
+    ]
+  }
+}

@@ -290,6 +290,29 @@ function instrumentBlock(
     const stmt = body[i];
     const line = stmt.loc?.start?.line ?? 0;
 
+    // Extract for-loop init so it gets its own capture step.
+    // var and expression inits are hoisted/function-scoped, so extracting
+    // them before the for statement is safe. let/const inits are left in
+    // place — their block-scope pushFrame already visualizes them.
+    if (stmt.type === 'ForStatement' && stmt.init) {
+      if (stmt.init.type === 'VariableDeclaration' && stmt.init.kind === 'var') {
+        const initDecl = stmt.init;
+        stmt.init = null;
+        body.splice(i, 0, initDecl);
+        continue; // re-process at index i, which now points to initDecl
+      } else if (stmt.init.type !== 'VariableDeclaration') {
+        // Expression init (e.g. i = 0)
+        const exprStmt: AnyNode = {
+          type: 'ExpressionStatement',
+          expression: stmt.init,
+          loc: stmt.init.loc,
+        };
+        stmt.init = null;
+        body.splice(i, 0, exprStmt);
+        continue; // re-process at index i, which now points to exprStmt
+      }
+    }
+
     // Before recursing, collect names this statement declares so that
     // the capture AFTER this statement can include them.
     const newNames = collectDeclaredNamesFromStmt(stmt);
@@ -612,6 +635,11 @@ function wrapReturnsInBranches(stmt: AnyNode): void {
  * Instrument a loop statement (for, while, do-while, for-in, for-of).
  */
 function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
+  // Wrap loop test expressions with __condition__ (like if statements)
+  if (stmt.test && (stmt.type === 'WhileStatement' || stmt.type === 'DoWhileStatement' || stmt.type === 'ForStatement')) {
+    stmt.test = buildConditionWrapper(stmt.test);
+  }
+
   // Collect loop-specific variable declarations
   const loopVars = [...scopeVars];
   const blockScopedVars: string[] = [];
@@ -647,6 +675,17 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
 
   // Insert loop guard at the top
   stmt.body.body.unshift(buildLoopGuard());
+
+  // Move for-loop update into body so it gets its own capture step
+  if (stmt.type === 'ForStatement' && stmt.update) {
+    const updateStmt: AnyNode = {
+      type: 'ExpressionStatement',
+      expression: stmt.update,
+      loc: stmt.update.loc,
+    };
+    stmt.update = null;
+    stmt.body.body.push(updateStmt);
+  }
 
   if (blockScopedVars.length > 0) {
     // Determine descriptive frame name
