@@ -24,11 +24,15 @@ let str = "hello";
 let bool = true;
 let nothing = null;
 let undef = undefined;
-console.log(num, str, bool, nothing, undef);`},{title:"Loops",category:"Basics",code:`let sum = 0;
+console.log(num, str, bool, nothing, undef);`},{title:"For Loop",category:"Basics",code:`let sum = 0;
 for (let i = 1; i <= 5; i++) {
   sum += i;
 }
-console.log("Sum:", sum);`},{title:"Conditionals",category:"Basics",code:`let age = 20;
+console.log("Sum:", sum);`},{title:"While Loop",category:"Basics",code:`let n = 1;
+while (n < 100) {
+  n = n * 2;
+}
+console.log(n);`},{title:"Conditionals",category:"Basics",code:`let age = 20;
 let category;
 
 if (age < 13) {
