@@ -156,30 +156,30 @@ console.log(cat.speak());
 console.log(dog.speak());`,
   },
 
-  // ── Async ──
-  {
-    title: 'setTimeout',
-    category: 'Async',
-    code: `console.log("Start");
+//   // ── Async ──
+//   {
+//     title: 'setTimeout',
+//     category: 'Async',
+//     code: `console.log("Start");
 
-setTimeout(function() {
-  console.log("Timeout fired!");
-}, 1000);
+// setTimeout(function() {
+//   console.log("Timeout fired!");
+// }, 1000);
 
-console.log("End");`,
-  },
-  {
-    title: 'Promises',
-    category: 'Async',
-    code: `let promise = new Promise(function(resolve) {
-  resolve(42);
-});
+// console.log("End");`,
+//   },
+//   {
+//     title: 'Promises',
+//     category: 'Async',
+//     code: `let promise = new Promise(function(resolve) {
+//   resolve(42);
+// });
 
-promise.then(function(value) {
-  console.log("Resolved:", value);
-  return value * 2;
-}).then(function(value) {
-  console.log("Chained:", value);
-});`,
-  },
+// promise.then(function(value) {
+//   console.log("Resolved:", value);
+//   return value * 2;
+// }).then(function(value) {
+//   console.log("Chained:", value);
+// });`,
+//   },
 ];
