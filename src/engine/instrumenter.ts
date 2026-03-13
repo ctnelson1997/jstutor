@@ -157,7 +157,7 @@ function buildCaptureExpression(varNames: string[], line: number): AnyNode {
   };
 }
 
-function buildPushFrame(name: string, paramNames: string[]): AnyNode {
+function buildPushFrame(name: string, paramNames: string[], isBlockScope = false): AnyNode {
   const properties = paramNames.map((n) => ({
     type: 'Property',
     key: { type: 'Identifier', name: n },
@@ -168,15 +168,21 @@ function buildPushFrame(name: string, paramNames: string[]): AnyNode {
     method: false,
   }));
 
+  const args: AnyNode[] = [
+    { type: 'Literal', value: name },
+    { type: 'ObjectExpression', properties },
+  ];
+
+  if (isBlockScope) {
+    args.push({ type: 'Literal', value: true });
+  }
+
   return {
     type: 'ExpressionStatement',
     expression: {
       type: 'CallExpression',
       callee: { type: 'Identifier', name: '__pushFrame__' },
-      arguments: [
-        { type: 'Literal', value: name },
-        { type: 'ObjectExpression', properties },
-      ],
+      arguments: args,
       optional: false,
     },
   };
@@ -194,10 +200,26 @@ function buildPopFrame(): AnyNode {
   };
 }
 
+function buildConditionWrapper(testExpr: AnyNode): AnyNode {
+  const line = testExpr.loc?.start?.line ?? 0;
+  const exprText = generate(testExpr);
+  return {
+    type: 'CallExpression',
+    callee: { type: 'Identifier', name: '__condition__' },
+    arguments: [
+      testExpr,
+      { type: 'Literal', value: line },
+      { type: 'Literal', value: exprText },
+    ],
+    optional: false,
+  };
+}
+
 function buildLoopGuard(): AnyNode {
   // if (++__loopCount > __MAX_LOOPS) throw new Error("Infinite loop detected (exceeded " + __MAX_LOOPS + " iterations)");
   return {
     type: 'IfStatement',
+    _isLoopGuard: true,
     test: {
       type: 'BinaryExpression',
       operator: '>',
@@ -341,6 +363,11 @@ function instrumentStatement(stmt: AnyNode, scopeVars: string[]): void {
       break;
 
     case 'IfStatement':
+      // Wrap the test expression with __condition__ to track the decision
+      // (skip synthetic loop guard nodes)
+      if (!stmt._isLoopGuard) {
+        stmt.test = buildConditionWrapper(stmt.test);
+      }
       // Wrap bare (non-block) branches so captures and popFrames work inside them
       if (stmt.consequent.type !== 'BlockStatement') {
         stmt.consequent = { type: 'BlockStatement', body: [stmt.consequent] };
@@ -627,7 +654,7 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
       : stmt.type === 'ForOfStatement' ? 'for...of' : 'for';
 
     // Push a block-scope frame after the loop guard
-    stmt.body.body.splice(1, 0, buildPushFrame(loopName, blockScopedVars));
+    stmt.body.body.splice(1, 0, buildPushFrame(loopName, blockScopedVars, true));
 
     // Set parent var context so captures distribute vars correctly
     const savedParentVarNames = _parentVarNames;

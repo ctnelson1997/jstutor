@@ -1,9 +1,10 @@
 import { useCallback, useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
-import { EditorView, Decoration, type DecorationSet } from '@codemirror/view';
+import { EditorView, Decoration, WidgetType, type DecorationSet } from '@codemirror/view';
 import { StateField, StateEffect } from '@codemirror/state';
 import { useStore } from '../store/useStore';
+import type { ConditionResult } from '../types/snapshot';
 
 // ── Line highlight via CodeMirror state effect ──
 
@@ -29,6 +30,56 @@ const highlightField = StateField.define<DecorationSet>({
   provide: (f) => EditorView.decorations.from(f),
 });
 
+// ── Condition result widget ──
+
+const setCondition = StateEffect.define<ConditionResult | null>();
+
+class ConditionWidget extends WidgetType {
+  result: boolean;
+  expression: string;
+
+  constructor(result: boolean, expression: string) {
+    super();
+    this.result = result;
+    this.expression = expression;
+  }
+
+  toDOM() {
+    const span = document.createElement('span');
+    span.className = `condition-badge condition-${this.result ? 'true' : 'false'}`;
+    span.textContent = this.result ? 'true' : 'false';
+    span.title = `${this.expression} → ${this.result}`;
+    return span;
+  }
+
+  eq(other: ConditionWidget) {
+    return this.result === other.result && this.expression === other.expression;
+  }
+}
+
+const conditionField = StateField.define<DecorationSet>({
+  create() {
+    return Decoration.none;
+  },
+  update(decos, tr) {
+    for (const effect of tr.effects) {
+      if (effect.is(setCondition)) {
+        if (effect.value === null) return Decoration.none;
+        const { result, expression, line } = effect.value;
+        if (line < 1 || line > tr.state.doc.lines) return Decoration.none;
+        const lineObj = tr.state.doc.line(line);
+        const widget = Decoration.widget({
+          widget: new ConditionWidget(result, expression),
+          side: 1,
+        });
+        return Decoration.set([widget.range(lineObj.to)]);
+      }
+    }
+    return decos;
+  },
+  provide: (f) => EditorView.decorations.from(f),
+});
+
 export default function EditorPanel() {
   const code = useStore((s) => s.code);
   const setCode = useStore((s) => s.setCode);
@@ -36,7 +87,7 @@ export default function EditorPanel() {
   const currentStep = useStore((s) => s.currentStep);
   const error = useStore((s) => s.error);
 
-  const extensions = useMemo(() => [javascript(), highlightField], []);
+  const extensions = useMemo(() => [javascript(), highlightField, conditionField], []);
 
   const onChange = useCallback(
     (value: string) => {
@@ -46,10 +97,9 @@ export default function EditorPanel() {
   );
 
   // Determine which line to highlight
-  const highlightLine =
-    snapshots.length > 0 && snapshots[currentStep]
-      ? snapshots[currentStep].line
-      : null;
+  const snapshot = snapshots.length > 0 ? snapshots[currentStep] : null;
+  const highlightLine = snapshot?.line ?? null;
+  const condition = snapshot?.condition ?? null;
 
   // Update the highlight decoration when step changes
   const onCreateEditor = useCallback(
@@ -60,12 +110,19 @@ export default function EditorPanel() {
     [],
   );
 
-  // Keep highlight in sync via an effect dispatch.
-  // Only dispatch when the desired line actually differs from the current
-  // decoration state to avoid triggering an infinite update loop.
+  // Keep highlight and condition badge in sync via effect dispatches.
+  // We use a stable reference string to detect changes, including
+  // same-line conditions with different results.
+  const conditionKey = condition
+    ? `${condition.line}:${condition.result}:${condition.expression}`
+    : null;
+
   const onUpdate = useCallback(
     (viewUpdate: { view: EditorView }) => {
       const view = viewUpdate.view;
+      const effects: StateEffect<unknown>[] = [];
+
+      // Check if highlight line needs updating
       const decoSet = view.state.field(highlightField);
       let currentlyHighlighted: number | null = null;
       const iter = decoSet.iter();
@@ -73,12 +130,18 @@ export default function EditorPanel() {
         currentlyHighlighted = view.state.doc.lineAt(iter.from).number;
       }
       if (currentlyHighlighted !== highlightLine) {
-        view.dispatch({
-          effects: setHighlightLine.of(highlightLine),
-        });
+        effects.push(setHighlightLine.of(highlightLine));
+      }
+
+      // Always sync condition badge (covers same-line result changes)
+      effects.push(setCondition.of(condition));
+
+      if (effects.length > 0) {
+        view.dispatch({ effects });
       }
     },
-    [highlightLine],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [highlightLine, conditionKey],
   );
 
   return (

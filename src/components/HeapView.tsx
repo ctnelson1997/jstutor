@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Card, ButtonGroup, Button } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
 import type { HeapObject, RuntimeValue, StackFrame } from '../types/snapshot';
+import { getChangedKeys } from '../utils/diffSnapshots';
 
 function ValueDisplay({ value }: { value: RuntimeValue }) {
   if (value.type === 'ref') {
@@ -30,15 +31,18 @@ function ValueDisplay({ value }: { value: RuntimeValue }) {
   );
 }
 
-function ArrayDisplay({ obj }: { obj: HeapObject }) {
+function ArrayDisplay({ obj, changedKeys, step }: { obj: HeapObject; changedKeys: Set<string>; step: number }) {
   return (
     <div className="array-cells">
-      {obj.properties.map((prop, i) => (
-        <div key={i} className="array-cell">
-          <span className="cell-index">{prop.key}</span>
-          <ValueDisplay value={prop.value} />
-        </div>
-      ))}
+      {obj.properties.map((prop, i) => {
+        const isChanged = changedKeys.has(`heap:${obj.id}:${prop.key}`);
+        return (
+          <div key={isChanged ? `${i}-${step}` : i} className={`array-cell${isChanged ? ' value-changed' : ''}`}>
+            <span className="cell-index">{prop.key}</span>
+            <ValueDisplay value={prop.value} />
+          </div>
+        );
+      })}
       {obj.properties.length === 0 && (
         <div className="array-cell text-muted" style={{ fontStyle: 'italic' }}>
           empty
@@ -48,20 +52,25 @@ function ArrayDisplay({ obj }: { obj: HeapObject }) {
   );
 }
 
-function ObjectDisplay({ obj }: { obj: HeapObject }) {
+function ObjectDisplay({ obj, changedKeys, step }: { obj: HeapObject; changedKeys: Set<string>; step: number }) {
   return (
     <table className="w-100">
       <tbody>
-        {obj.properties.map((prop) => (
-          <tr key={prop.key}>
-            <td style={{ fontFamily: 'monospace', fontWeight: 500, fontSize: '0.8rem' }}>
-              {prop.key}
-            </td>
-            <td className="text-end">
-              <ValueDisplay value={prop.value} />
-            </td>
-          </tr>
-        ))}
+        {obj.properties.map((prop) => {
+          const isChanged = changedKeys.has(`heap:${obj.id}:${prop.key}`);
+          return (
+            <tr key={prop.key}>
+              <td style={{ fontFamily: 'monospace', fontWeight: 500, fontSize: '0.8rem' }}>
+                {prop.key}
+              </td>
+              <td className="text-end">
+                <span key={isChanged ? step : undefined} className={isChanged ? 'value-changed' : undefined}>
+                  <ValueDisplay value={prop.value} />
+                </span>
+              </td>
+            </tr>
+          );
+        })}
         {obj.properties.length === 0 && (
           <tr>
             <td colSpan={2} className="text-muted" style={{ fontStyle: 'italic' }}>
@@ -83,7 +92,7 @@ function FunctionDisplay({ obj }: { obj: HeapObject }) {
   );
 }
 
-function HeapCard({ obj }: { obj: HeapObject }) {
+function HeapCard({ obj, changedKeys, step }: { obj: HeapObject; changedKeys: Set<string>; step: number }) {
   const typeLabels: Record<string, string> = {
     array: 'Array',
     object: 'Object',
@@ -117,11 +126,11 @@ function HeapCard({ obj }: { obj: HeapObject }) {
       </Card.Header>
       <Card.Body>
         {obj.objectType === 'array' ? (
-          <ArrayDisplay obj={obj} />
+          <ArrayDisplay obj={obj} changedKeys={changedKeys} step={step} />
         ) : obj.objectType === 'function' ? (
           <FunctionDisplay obj={obj} />
         ) : (
-          <ObjectDisplay obj={obj} />
+          <ObjectDisplay obj={obj} changedKeys={changedKeys} step={step} />
         )}
       </Card.Body>
     </Card>
@@ -145,6 +154,11 @@ export default function HeapView() {
   const [filter, setFilter] = useState<HeapFilter>('all');
 
   const snapshot = snapshots[currentStep];
+
+  const changedKeys = useMemo(
+    () => getChangedKeys(snapshots[currentStep - 1], snapshots[currentStep]),
+    [snapshots, currentStep],
+  );
 
   const visibleObjects = useMemo(() => {
     if (!snapshot || snapshot.heap.length === 0) return [];
@@ -187,7 +201,7 @@ export default function HeapView() {
       ) : (
         <div className="d-flex flex-wrap gap-2">
           {visibleObjects.map((obj) => (
-            <HeapCard key={obj.id} obj={obj} />
+            <HeapCard key={obj.id} obj={obj} changedKeys={changedKeys} step={currentStep} />
           ))}
         </div>
       )}

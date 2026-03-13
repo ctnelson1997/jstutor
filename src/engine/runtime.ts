@@ -186,6 +186,35 @@ function __collectHeap__(stackSnapshot) {
   return result;
 }
 
+// ── Condition tracking ──
+
+function __condition__(value, line, expression) {
+  if (__snapshots__.length >= __MAX_SNAPSHOTS) return value;
+
+  // Build a snapshot at the condition line using the current call stack state
+  var stackSnapshot = [];
+  for (var c = 0; c < __callStack__.length; c++) {
+    var fr = __callStack__[c];
+    var ent = {
+      name: fr.name,
+      variables: fr.variables || []
+    };
+    if (fr.isBlockScope) ent.isBlockScope = true;
+    stackSnapshot.push(ent);
+  }
+
+  __snapshots__.push({
+    step: __snapshots__.length,
+    line: line,
+    callStack: stackSnapshot,
+    heap: __collectHeap__(stackSnapshot),
+    stdout: __stdout__.slice(),
+    condition: { expression: expression, result: !!value, line: line }
+  });
+
+  return value;
+}
+
 // ── Capture ──
 
 function __capture__(line, vars, parentVarNames) {
@@ -249,10 +278,12 @@ function __capture__(line, vars, parentVarNames) {
   var stackSnapshot = [];
   for (var j = 0; j < __callStack__.length; j++) {
     var frame = __callStack__[j];
-    stackSnapshot.push({
+    var entry = {
       name: frame.name,
       variables: frame.variables || []
-    });
+    };
+    if (frame.isBlockScope) entry.isBlockScope = true;
+    stackSnapshot.push(entry);
   }
 
   __snapshots__.push({
@@ -266,8 +297,8 @@ function __capture__(line, vars, parentVarNames) {
 
 // ── Frame management ──
 
-function __pushFrame__(name, params) {
-  var frame = { name: name, variables: [] };
+function __pushFrame__(name, params, isBlockScope) {
+  var frame = { name: name, variables: [], isBlockScope: !!isBlockScope };
   // Serialize params as initial frame variables
   var heapObjects = [];
   var visited = new Set();
@@ -306,10 +337,12 @@ function __popFrame__(retVal, line) {
       var stackSnapshot = [];
       for (var j = 0; j < __callStack__.length; j++) {
         var frame = __callStack__[j];
-        stackSnapshot.push({
+        var entry2 = {
           name: frame.name,
           variables: j === __callStack__.length - 1 ? retVars : (frame.variables || [])
-        });
+        };
+        if (frame.isBlockScope) entry2.isBlockScope = true;
+        stackSnapshot.push(entry2);
       }
       __snapshots__.push({
         step: __snapshots__.length,

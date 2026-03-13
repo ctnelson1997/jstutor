@@ -17,7 +17,7 @@ export default function AppNavbar() {
   return (
     <Navbar bg="dark" variant="dark" expand="md" className="px-3">
       <Navbar.Brand className="fw-bold">
-        <span style={{ color: '#f7df1e' }}>JS</span>Tutor
+        <span style={{ color: '#C5050C' }}>JS</span>Tutor
       </Navbar.Brand>
       <Navbar.Toggle aria-controls="navbar-nav" />
       <Navbar.Collapse id="navbar-nav">

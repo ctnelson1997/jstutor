@@ -50,9 +50,16 @@ export interface Variable {
 export interface StackFrame {
   name: string;
   variables: Variable[];
+  isBlockScope?: boolean;
 }
 
 // ── Execution snapshot ──
+
+export interface ConditionResult {
+  expression: string;
+  result: boolean;
+  line: number;
+}
 
 export interface ExecutionSnapshot {
   step: number;
@@ -60,6 +67,7 @@ export interface ExecutionSnapshot {
   callStack: StackFrame[];
   heap: HeapObject[];
   stdout: string[];
+  condition?: ConditionResult;
 }
 
 // ── Execution result from the worker ──
