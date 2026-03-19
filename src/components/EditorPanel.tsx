@@ -211,7 +211,7 @@ export default function EditorPanel() {
       )}
 
       {/* CodeMirror editor */}
-      <div ref={wrapperRef} className="flex-grow-1" style={{ minHeight: 0 }}>
+      <div ref={wrapperRef} className="flex-grow-1" style={{ minHeight: 0, overflow: 'hidden' }}>
         <CodeMirror
           value={paddedCode}
           extensions={extensions}

@@ -20,13 +20,14 @@ html, body, #root {
   flex-direction: column;
 }
 
-/* Main layout fills remaining space below navbar */
+/* Main layout fills remaining space below navbar, above fixed footer */
 .main-layout {
   flex: 1;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: row;
+  margin-bottom: 20px;
 }
 
 /* Draggable split divider */
@@ -125,7 +126,6 @@ html, body, #root {
 
 .cm-scroller {
   overflow: auto !important;
-  min-height: 100% !important;
 }
 
 /* Make the gutter background extend to fill the full editor height */
