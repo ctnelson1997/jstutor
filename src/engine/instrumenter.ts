@@ -292,14 +292,30 @@ function instrumentBlock(
 
     // Extract for-loop init so it gets its own capture step.
     // var and expression inits are hoisted/function-scoped, so extracting
-    // them before the for statement is safe. let/const inits are left in
-    // place — their block-scope pushFrame already visualizes them.
+    // them before the for statement is safe. let/const inits are also extracted
+    // so that the block-scope frame can be pushed before the condition check.
     if (stmt.type === 'ForStatement' && stmt.init) {
       if (stmt.init.type === 'VariableDeclaration' && stmt.init.kind === 'var') {
         const initDecl = stmt.init;
         stmt.init = null;
         body.splice(i, 0, initDecl);
         continue; // re-process at index i, which now points to initDecl
+      } else if (
+        stmt.init.type === 'VariableDeclaration' &&
+        (stmt.init.kind === 'let' || stmt.init.kind === 'const')
+      ) {
+        // Extract let/const init so the variable is in scope before __pushFrame__
+        // is called in the wrapper block (needed to keep the block-scope frame alive
+        // during condition checks). Stash var names on the node for instrumentLoop.
+        const bsvNames: string[] = [];
+        for (const decl of stmt.init.declarations) {
+          extractPatternNames(decl.id, bsvNames);
+        }
+        stmt._blockScopeVars = bsvNames;
+        const initDecl = stmt.init;
+        stmt.init = null;
+        body.splice(i, 0, initDecl);
+        continue; // re-process at index i (initDecl), then the for-stmt
       } else if (stmt.init.type !== 'VariableDeclaration') {
         // Expression init (e.g. i = 0)
         const exprStmt: AnyNode = {
@@ -325,6 +341,15 @@ function instrumentBlock(
     // Recurse into nested structures first
     // Pass the full set of vars visible at this point
     instrumentStatement(stmt, declaredSoFar);
+
+    // If instrumentLoop flagged a block-scope wrap (for let/const for-loops),
+    // replace body[i] with: { __pushFrame__('for',{i},true); for(...){...}; __popFrame__(); }
+    // This keeps the block-scope frame alive during every condition check.
+    if (stmt._blockWrap) {
+      const { push, pop } = stmt._blockWrap as { push: AnyNode; pop: AnyNode };
+      delete stmt._blockWrap;
+      body[i] = { type: 'BlockStatement', body: [push, stmt, pop] };
+    }
 
     // For return/throw, insert capture BEFORE (capture after is dead code)
     if (stmt.type === 'ReturnStatement' || stmt.type === 'ThrowStatement') {
@@ -665,6 +690,15 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
     }
   }
 
+  // If instrumentBlock pre-extracted a let/const for-init, pick up the stashed names.
+  // The vars are already in loopVars (via scopeVars), just need blockScopedVars populated.
+  if (stmt._blockScopeVars) {
+    for (const name of stmt._blockScopeVars as string[]) {
+      if (!blockScopedVars.includes(name)) blockScopedVars.push(name);
+    }
+    delete stmt._blockScopeVars;
+  }
+
   // Ensure the body is a block statement
   if (stmt.body.type !== 'BlockStatement') {
     stmt.body = {
@@ -692,19 +726,28 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
     const loopName = stmt.type === 'ForInStatement' ? 'for...in'
       : stmt.type === 'ForOfStatement' ? 'for...of' : 'for';
 
-    // Push a block-scope frame after the loop guard
-    stmt.body.body.splice(1, 0, buildPushFrame(loopName, blockScopedVars, true));
+    const pushNode = buildPushFrame(loopName, blockScopedVars, true);
+    const popNode = buildPopFrame();
 
-    // Set parent var context so captures distribute vars correctly
+    if (stmt.type === 'ForStatement' && stmt.init === null) {
+      // let/const init was pre-extracted into the parent block: push/pop go in a
+      // wrapper block around the for statement so the frame is alive during every
+      // condition check. instrumentBlock will apply the wrapper after this returns.
+      stmt._blockWrap = { push: pushNode, pop: popNode };
+    } else {
+      // for...in / for...of: no separate condition step, so push/pop inside body is fine
+      stmt.body.body.splice(1, 0, pushNode);
+      stmt.body.body.push(popNode);
+    }
+
+    // Set parent var context so captures distribute vars correctly.
+    // Exclude block-scoped loop vars — they belong to the block frame, not the parent.
     const savedParentVarNames = _parentVarNames;
-    _parentVarNames = scopeVars.slice();
+    _parentVarNames = scopeVars.filter((n: string) => !blockScopedVars.includes(n));
 
     instrumentBlock(stmt.body.body, loopVars, false);
 
     _parentVarNames = savedParentVarNames;
-
-    // Pop the block-scope frame at the end of the body
-    stmt.body.body.push(buildPopFrame());
   } else {
     // No block-scoped vars (e.g. var-based loop) — normal instrumentation
     instrumentBlock(stmt.body.body, loopVars, false);

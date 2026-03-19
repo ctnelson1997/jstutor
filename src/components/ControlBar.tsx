@@ -1,4 +1,5 @@
-import { Button, Form, Spinner } from 'react-bootstrap';
+import { useState } from 'react';
+import { Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
 import { runCode } from '../engine/executor';
 import { encodeShareCode } from '../utils/share';
@@ -49,6 +50,10 @@ export default function ControlBar() {
   const stepLast = useStore((s) => s.stepLast);
   const reset = useStore((s) => s.reset);
 
+  const [shareUrl, setShareUrl] = useState('');
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const total = snapshots.length;
   const hasSteps = total > 0;
 
@@ -61,14 +66,23 @@ export default function ControlBar() {
     }
   };
 
-  const handleShare = async () => {
+  const handleShare = () => {
     const encoded = encodeShareCode(code);
     const url = `${window.location.origin}${window.location.pathname}#/share/${encoded}`;
+    setShareUrl(url);
+    setCopied(false);
+    setShowShareModal(true);
+  };
+
+  const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(url);
-      alert('Share link copied to clipboard!');
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      prompt('Copy this share link:', url);
+      // fallback: select the input so user can copy manually
+      const input = document.getElementById('share-url-input') as HTMLInputElement | null;
+      input?.select();
     }
   };
 
@@ -150,6 +164,35 @@ export default function ControlBar() {
           onChange={(e) => setCurrentStep(Number(e.target.value))}
         />
       )}
+
+      <Modal show={showShareModal} onHide={() => setShowShareModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1rem' }}>Share this snippet</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-3" style={{ fontSize: '0.875rem' }}>
+            Anyone with this link can view and step through your code. Paste it into a browser to open it in JSTutor.
+          </p>
+          <div className="d-flex gap-2">
+            <Form.Control
+              id="share-url-input"
+              type="text"
+              readOnly
+              value={shareUrl}
+              onClick={(e) => (e.target as HTMLInputElement).select()}
+              style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}
+            />
+            <Button
+              variant={copied ? 'success' : 'outline-primary'}
+              size="sm"
+              onClick={handleCopy}
+              style={{ whiteSpace: 'nowrap', minWidth: '80px' }}
+            >
+              {copied ? 'Copied!' : 'Copy link'}
+            </Button>
+          </div>
+        </Modal.Body>
+      </Modal>
     </div>
   );
 }
