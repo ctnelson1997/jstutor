@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorView, Decoration, WidgetType, type DecorationSet } from '@codemirror/view';
@@ -102,16 +102,17 @@ export default function EditorPanel() {
 
   // Pad the document with trailing newlines so line numbers fill the
   // visible editor area. A ResizeObserver keeps the count in sync with
-  // the actual container height.
+  // the actual container height. We use a ref (not state) for minLines
+  // so resize events don't trigger re-renders that disrupt typing/scroll.
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const [minLines, setMinLines] = useState(25);
+  const minLinesRef = useRef(25);
+  const prevPaddedRef = useRef('');
 
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
-      // ~20px per line is a safe approximation for CodeMirror's default font
-      setMinLines(Math.ceil(el.clientHeight / 20) + 1);
+      minLinesRef.current = Math.ceil(el.clientHeight / 20) + 1;
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -119,9 +120,16 @@ export default function EditorPanel() {
 
   const paddedCode = useMemo(() => {
     const lineCount = code.split('\n').length;
+    const minLines = minLinesRef.current;
     if (lineCount >= minLines) return code;
     return code + '\n'.repeat(minLines - lineCount);
-  }, [code, minLines]);
+  }, [code]);
+
+  // Cache so CodeMirror only sees a new value when the visible content
+  // actually changes, not on every render.
+  if (paddedCode !== prevPaddedRef.current) {
+    prevPaddedRef.current = paddedCode;
+  }
 
   const onChange = useCallback(
     (value: string) => {
