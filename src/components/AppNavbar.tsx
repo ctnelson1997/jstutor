@@ -19,12 +19,12 @@ export default function AppNavbar() {
   return (
     <Navbar bg="dark" variant="dark" expand="md" className="px-3">
       <Navbar.Brand as={Link} to="/" className="fw-bold">
-        <span style={{ color: '#C5050C' }}>JS</span>Tutor
+        <span style={{ color: '#DD030B' }}>JS</span>Tutor
       </Navbar.Brand>
       <Navbar.Toggle aria-controls="navbar-nav" />
       <Navbar.Collapse id="navbar-nav">
         <Nav className="me-auto">
-          <Nav.Link onClick={handleSandbox} style={{ cursor: 'pointer' }}>Sandbox</Nav.Link>
+          <Nav.Link as="button" onClick={handleSandbox}>Sandbox</Nav.Link>
           <NavDropdown title="Examples" id="nav-examples">
             {categories.map((cat, i) => (
               <>
@@ -42,6 +42,7 @@ export default function AppNavbar() {
             ))}
           </NavDropdown>
           <Nav.Link as={Link} to="/about">About</Nav.Link>
+          <Nav.Link as={Link} to="/privacy-policy">Privacy Policy</Nav.Link>
         </Nav>
       </Navbar.Collapse>
     </Navbar>

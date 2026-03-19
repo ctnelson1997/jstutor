@@ -8,6 +8,9 @@ import ShareWarningPage from './pages/ShareWarningPage';
 import ExamplePage from './pages/ExamplePage';
 import EmbedPage from './pages/EmbedPage';
 import AboutPage from './pages/AboutPage';
+import PrivacyPage from './pages/PrivacyPage';
+import NotFoundPage from './pages/NotFoundPage';
+import AppFooter from './components/AppFooter';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -18,7 +21,10 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/embed/:encoded" element={<EmbedPage />} />
         <Route path="/share/:encoded" element={<ShareWarningPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
+      <AppFooter />
     </HashRouter>
   </StrictMode>,
 );

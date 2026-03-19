@@ -1,6 +1,13 @@
 :root {
   --console-bg: #1e1e1e;
   --console-fg: #d4d4d4;
+  /* Darker than Bootstrap default (#d63384) to meet WCAG AA 4.5:1 on white */
+  --bs-code-color: #b5006e;
+}
+
+/* Prevent .text-muted's !important from washing out code elements */
+.text-muted code {
+  color: var(--bs-code-color) !important;
 }
 
 html, body, #root {
@@ -318,4 +325,38 @@ html, body, #root {
     flex-wrap: wrap;
     row-gap: 4px;
   }
+}
+
+/* Fixed footer */
+.app-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: #212529;
+  color: #6c757d;
+  font-size: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  z-index: 1030;
+  border-top: 1px solid #343a40;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-footer-link {
+  color: #adb5bd;
+  text-decoration: none;
+}
+
+.app-footer-link:hover {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.app-footer-sep {
+  color: #495057;
 }

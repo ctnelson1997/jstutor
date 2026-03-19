@@ -183,6 +183,7 @@ export default function HeapView() {
           variant={filter === 'all' ? 'primary' : 'outline-primary'}
           onClick={() => setFilter('all')}
           style={{ fontSize: '0.7rem' }}
+          aria-pressed={filter === 'all'}
         >
           All frames
         </Button>
@@ -190,6 +191,7 @@ export default function HeapView() {
           variant={filter === 'current' ? 'primary' : 'outline-primary'}
           onClick={() => setFilter('current')}
           style={{ fontSize: '0.7rem' }}
+          aria-pressed={filter === 'current'}
         >
           Current frame
         </Button>

@@ -14,21 +14,21 @@ export default function VisualizationPanel() {
       <div className="viz-scroll p-2" ref={vizRef} style={{ position: 'relative' }}>
         {snapshots.length === 0 ? (
           <div className="text-center text-muted mt-5">
-            <h5>Memory Visualization</h5>
+            <p className="fw-semibold fs-5">Memory Visualization</p>
             <p>Write some code and click <strong>Visualize</strong> to see how it runs step by step.</p>
           </div>
         ) : (
           <div className="d-flex flex-wrap gap-3">
             <div style={{ minWidth: '200px', flex: '1 1 40%' }}>
-              <h6 className="text-muted mb-2" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>
+              <div className="text-muted mb-2" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
                 Frames
-              </h6>
+              </div>
               <FramesView />
             </div>
             <div style={{ minWidth: '200px', flex: '1 1 55%' }}>
-              <h6 className="text-muted mb-2" style={{ fontSize: '0.75rem', textTransform: 'uppercase' }}>
+              <div className="text-muted mb-2" style={{ fontSize: '0.75rem', textTransform: 'uppercase', fontWeight: 600 }}>
                 Objects
-              </h6>
+              </div>
               <HeapView />
             </div>
             <PointerArrows containerRef={vizRef} />

@@ -7,12 +7,12 @@ export default function AboutPage() {
       <AppNavbar />
       <div className="container py-5" style={{ maxWidth: '760px' }}>
         <h1 className="fw-bold mb-1">
-          <span style={{ color: '#C5050C' }}>JS</span>Tutor
+          <span style={{ color: '#DD030B' }}>JS</span>Tutor
         </h1>
         <p className="text-muted mb-4">Authored by <a target='_blank' href='https://coletnelson.us'>Cole Nelson</a> of the <a target='_blank' href='https://www.cs.wisc.edu/'>University of Wisconsin-Madison</a></p>
 
         <section className="mb-4">
-          <h4>What is JSTutor?</h4>
+          <h2>What is JSTutor?</h2>
           <p>
             JSTutor is a browser-based tool that helps you understand how JavaScript code executes
             step by step. Write a snippet of JavaScript, press <strong>Visualize</strong> (or{' '}
@@ -27,7 +27,7 @@ export default function AboutPage() {
         </section>
 
         <section className="mb-4">
-          <h4 className="mb-3">How to Use It</h4>
+          <h2 className="mb-3">How to Use It</h2>
           <div className="d-flex flex-column gap-3">
             {[
               {
@@ -75,7 +75,7 @@ export default function AboutPage() {
               <div key={n} className="d-flex gap-3 align-items-start">
                 <div
                   className="fw-bold text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 32, height: 32, background: '#C5050C', fontSize: '0.9rem', marginTop: 2 }}
+                  style={{ width: 32, height: 32, background: '#DD030B', fontSize: '0.9rem', marginTop: 2 }}
                 >
                   {n}
                 </div>
@@ -89,7 +89,7 @@ export default function AboutPage() {
         </section>
 
         <section className="mb-4">
-          <h4 className="mb-3">Tips</h4>
+          <h2 className="mb-3">Tips</h2>
           <div className="d-flex flex-wrap gap-2">
             {[
               { icon: '↔', text: <>Drag the divider between panels to resize the editor and visualization.</> },
@@ -102,7 +102,7 @@ export default function AboutPage() {
                 className="border rounded px-3 py-2 d-flex align-items-start gap-2"
                 style={{ background: '#f8f9fa', fontSize: '0.9rem', flex: '1 1 260px' }}
               >
-                <span style={{ color: '#C5050C', fontSize: '1rem', lineHeight: 1.6, flexShrink: 0 }}>{icon}</span>
+                <span style={{ color: '#DD030B', fontSize: '1rem', lineHeight: 1.6, flexShrink: 0 }}>{icon}</span>
                 <span className="text-muted">{text}</span>
               </div>
             ))}
@@ -110,7 +110,7 @@ export default function AboutPage() {
         </section>
 
         <section className="mb-4">
-          <h4 className="mb-3">Technical Notes</h4>
+          <h2 className="mb-3">Technical Notes</h2>
           <div
             className="border rounded px-4 py-3 mb-3 d-flex align-items-start gap-3"
             style={{ background: '#f8f9fa' }}
@@ -143,7 +143,7 @@ export default function AboutPage() {
                 className="border rounded px-3 py-2 text-decoration-none"
                 style={{ background: '#f8f9fa', flex: '0 0 auto' }}
               >
-                <span className="fw-semibold" style={{ fontSize: '0.85rem', color: '#C5050C' }}>{label}</span>
+                <span className="fw-semibold" style={{ fontSize: '0.85rem', color: '#DD030B' }}>{label}</span>
                 <span className="text-muted ms-2" style={{ fontSize: '0.8rem' }}>{desc}</span>
               </a>
             ))}

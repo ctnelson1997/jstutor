@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
@@ -7,33 +7,33 @@ import { encodeShareCode } from '../utils/share';
 
 const iconStyle = { width: 14, height: 14, fill: 'currentColor', verticalAlign: '-2px' } as const;
 
-function IconSkipStart() {
+function IconSkipStart(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle} {...props}>
       <path d="M4 4a.5.5 0 0 1 1 0v3.248l6.267-3.636A.5.5 0 0 1 12 4.118v7.764a.5.5 0 0 1-.733.443L5 8.752V12a.5.5 0 0 1-1 0V4z" />
     </svg>
   );
 }
 
-function IconStepBack() {
+function IconStepBack(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle} {...props}>
       <path d="M3.86 8.753l5.482 4.796c.646.566 1.658.106 1.658-.753V3.204a1 1 0 0 0-1.659-.753l-5.48 4.796a1 1 0 0 0 0 1.506z" />
     </svg>
   );
 }
 
-function IconStepForward() {
+function IconStepForward(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle} {...props}>
       <path d="M12.14 8.753l-5.482 4.796c-.646.566-1.658.106-1.658-.753V3.204a1 1 0 0 1 1.659-.753l5.48 4.796a1 1 0 0 1 0 1.506z" />
     </svg>
   );
 }
 
-function IconSkipEnd() {
+function IconSkipEnd(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle}>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style={iconStyle} {...props}>
       <path d="M12 4a.5.5 0 0 0-1 0v3.248L4.733 3.612A.5.5 0 0 0 4 4.118v7.764a.5.5 0 0 0 .733.443L11 8.752V12a.5.5 0 0 0 1 0V4z" />
     </svg>
   );
@@ -140,7 +140,7 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
         >
           {isRunning ? (
             <>
-              <Spinner animation="border" size="sm" className="me-1" />
+              <Spinner animation="border" size="sm" className="me-1" aria-hidden="true" />
               Running...
             </>
           ) : hasSteps ? (
@@ -157,20 +157,20 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
               size="sm"
               onClick={stepFirst}
               disabled={currentStep === 0}
-              title="First step"
+              aria-label="First step"
             >
-              <IconSkipStart />
+              <IconSkipStart aria-hidden="true" />
             </Button>
             <Button
               variant="outline-secondary"
               size="sm"
               onClick={stepBackward}
               disabled={currentStep === 0}
-              title="Previous step (← arrow key)"
+              aria-label="Previous step (left arrow key)"
             >
-              <IconStepBack />
+              <IconStepBack aria-hidden="true" />
             </Button>
-            <span className="text-muted" style={{ fontSize: '0.85rem', minWidth: '100px', textAlign: 'center' }}>
+            <span className="text-muted" style={{ fontSize: '0.85rem', minWidth: '100px', textAlign: 'center' }} aria-live="polite" aria-atomic="true">
               Step {currentStep + 1} of {total}
             </span>
             <Button
@@ -178,18 +178,18 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
               size="sm"
               onClick={stepForward}
               disabled={currentStep === total - 1}
-              title="Next step (→ arrow key)"
+              aria-label="Next step (right arrow key)"
             >
-              <IconStepForward />
+              <IconStepForward aria-hidden="true" />
             </Button>
             <Button
               variant="outline-secondary"
               size="sm"
               onClick={stepLast}
               disabled={currentStep === total - 1}
-              title="Last step"
+              aria-label="Last step"
             >
-              <IconSkipEnd />
+              <IconSkipEnd aria-hidden="true" />
             </Button>
           </>
         )}
@@ -221,6 +221,8 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
           max={total - 1}
           value={currentStep}
           onChange={(e) => setCurrentStep(Number(e.target.value))}
+          aria-label="Execution step"
+          aria-valuetext={`Step ${currentStep + 1} of ${total}`}
         />
       )}
 

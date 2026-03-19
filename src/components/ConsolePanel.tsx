@@ -47,13 +47,29 @@ export default function ConsolePanel() {
       <div
         className={`console-resize-handle${dragging ? ' active' : ''}`}
         onMouseDown={onMouseDown}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize console panel. Use up/down arrow keys to adjust height."
+        tabIndex={0}
+        onKeyDown={(e) => {
+          const wrapper = wrapperRef.current;
+          if (!wrapper) return;
+          const curr = wrapper.getBoundingClientRect().height;
+          if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            wrapper.style.height = `${Math.min(window.innerHeight * 0.6, curr + 20)}px`;
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            wrapper.style.height = `${Math.max(60, curr - 20)}px`;
+          }
+        }}
       />
       <div className="console-panel">
-        <div style={{ fontSize: '0.7rem', color: '#888', marginBottom: '0.25rem' }}>
+        <div style={{ fontSize: '0.7rem', color: '#aaa', marginBottom: '0.25rem' }}>
           Console Output
         </div>
         {stdout.length === 0 ? (
-          <div style={{ color: '#666', fontStyle: 'italic' }}>No output yet</div>
+          <div style={{ color: '#999', fontStyle: 'italic' }}>No output yet</div>
         ) : (
           stdout.map((line, i) => (
             <div key={i}>{line}</div>
