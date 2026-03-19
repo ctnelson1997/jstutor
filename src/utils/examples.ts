@@ -91,15 +91,15 @@ console.log(counter()); // 3`,
     category: 'Functions',
     code: `let numbers = [1, 2, 3, 4, 5];
 
-let doubled = numbers.map(function(n) {
-  return n * 2;
+let tripled = numbers.map(function(n) {
+  return n * 3;
 });
 
-let evens = doubled.filter(function(n) {
+let evens = tripled.filter(function(n) {
   return n % 2 === 0;
 });
 
-console.log("doubled:", doubled);
+console.log("tripled:", tripled);
 console.log("evens:", evens);`,
   },
 

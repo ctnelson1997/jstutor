@@ -7,52 +7,41 @@ import VisualizationPanel from './components/VisualizationPanel';
 import { useStore } from './store/useStore';
 import { runCode } from './engine/executor';
 
-export default function App() {
+export default function App({ embed = false }: { embed?: boolean }) {
   const stepForward = useStore((s) => s.stepForward);
   const stepBackward = useStore((s) => s.stepBackward);
   const code = useStore((s) => s.code);
-  const snapshots = useStore((s) => s.snapshots);
 
-  const shouldShowToast = localStorage.getItem('jstutor-hide-warning') !== 'true';
+  const shouldShowToast = !embed && localStorage.getItem('jstutor-hide-warning') !== 'true';
   const [showToast, setShowToast] = useState(false);
 
-  // Resizable split (desktop only)
   const [splitPercent, setSplitPercent] = useState(40);
   const dragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
-
-  // Mobile detection & tab state
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 991px)').matches);
-  const [activeTab, setActiveTab] = useState<'editor' | 'viz'>('editor');
+  const [isStacked, setIsStacked] = useState(() => window.matchMedia('(max-width: 700px)').matches);
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 991px)');
-    const handler = () => setIsMobile(mq.matches);
+    const mq = window.matchMedia('(max-width: 700px)');
+    const handler = () => setIsStacked(mq.matches);
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, []);
-
-  // Auto-switch to viz tab on mobile when visualization runs
-  const hasSnapshots = snapshots.length > 0;
-  useEffect(() => {
-    if (isMobile && hasSnapshots) {
-      setActiveTab('viz');
-    }
-  }, [isMobile, hasSnapshots]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     dragging.current = true;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
     document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'col-resize';
-  }, []);
+    document.body.style.cursor = isStacked ? 'ns-resize' : 'col-resize';
+  }, [isStacked]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
-    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    const pct = isStacked
+      ? ((e.clientY - rect.top) / rect.height) * 100
+      : ((e.clientX - rect.left) / rect.width) * 100;
     setSplitPercent(Math.min(80, Math.max(20, pct)));
-  }, []);
+  }, [isStacked]);
 
   const onPointerUp = useCallback(() => {
     dragging.current = false;
@@ -67,7 +56,6 @@ export default function App() {
     }
   }, [shouldShowToast]);
 
-  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -97,49 +85,33 @@ export default function App() {
 
   return (
     <>
-      <AppNavbar />
+      {!embed && <AppNavbar />}
+      <ControlBar embed={embed} />
 
-      {isMobile ? (
-        <div className="mobile-layout">
-          <ControlBar />
-          <div className="mobile-tab-bar">
-            <button
-              className={`mobile-tab${activeTab === 'editor' ? ' active' : ''}`}
-              onClick={() => setActiveTab('editor')}
-            >
-              Editor
-            </button>
-            <button
-              className={`mobile-tab${activeTab === 'viz' ? ' active' : ''}`}
-              onClick={() => setActiveTab('viz')}
-            >
-              Visualization
-            </button>
-          </div>
-          <div className="mobile-panel">
-            {activeTab === 'editor' ? <EditorPanel /> : <VisualizationPanel />}
-          </div>
-        </div>
-      ) : (
+      <div
+        className="main-layout"
+        ref={containerRef}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
         <div
-          className="main-layout"
-          ref={containerRef}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
+          className="editor-column border-end"
+          style={isStacked ? { width: '100%', height: `${splitPercent}%` } : { width: `${splitPercent}%` }}
         >
-          <div className="editor-column border-end" style={{ width: `${splitPercent}%` }}>
-            <EditorPanel />
-          </div>
-          <div
-            className="split-divider"
-            onPointerDown={onPointerDown}
-          />
-          <div className="viz-column" style={{ width: `${100 - splitPercent}%` }}>
-            <ControlBar />
-            <VisualizationPanel />
-          </div>
+          <EditorPanel />
         </div>
-      )}
+        <div
+          className="split-divider"
+          style={{ cursor: isStacked ? 'ns-resize' : 'col-resize' }}
+          onPointerDown={onPointerDown}
+        />
+        <div
+          className="viz-column"
+          style={isStacked ? { width: '100%', height: `${100 - splitPercent}%` } : { width: `${100 - splitPercent}%` }}
+        >
+          <VisualizationPanel />
+        </div>
+      </div>
 
       <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>
         <Toast show={showToast} onClose={() => setShowToast(false)} animation>

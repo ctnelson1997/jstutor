@@ -6,6 +6,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 import ShareWarningPage from './pages/ShareWarningPage';
 import ExamplePage from './pages/ExamplePage';
+import EmbedPage from './pages/EmbedPage';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/examples/:slug" element={<ExamplePage />} />
+        <Route path="/embed/:encoded" element={<EmbedPage />} />
         <Route path="/share/:encoded" element={<ShareWarningPage />} />
       </Routes>
     </HashRouter>

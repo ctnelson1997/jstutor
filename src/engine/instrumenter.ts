@@ -313,6 +313,7 @@ function instrumentBlock(
         }
         stmt._blockScopeVars = bsvNames;
         const initDecl = stmt.init;
+        initDecl._isBlockScopeInit = true; // marks this decl as loop-local; skip parent captures
         stmt.init = null;
         body.splice(i, 0, initDecl);
         continue; // re-process at index i (initDecl), then the for-stmt
@@ -331,12 +332,23 @@ function instrumentBlock(
 
     // Before recursing, collect names this statement declares so that
     // the capture AFTER this statement can include them.
-    const newNames = collectDeclaredNamesFromStmt(stmt);
-    for (const name of newNames) {
-      if (!declaredSoFar.includes(name)) {
-        declaredSoFar.push(name);
+    // Skip block-scope-init declarations (extracted for-loop let/const vars) —
+    // those belong only to the loop's block frame, not the parent scope.
+    if (!stmt._isBlockScopeInit) {
+      const newNames = collectDeclaredNamesFromStmt(stmt);
+      for (const name of newNames) {
+        if (!declaredSoFar.includes(name)) {
+          declaredSoFar.push(name);
+        }
       }
     }
+
+    // Save block-scoped loop vars before instrumentStatement deletes them.
+    // These were stashed by the for-init extraction path and belong only to
+    // the loop's block frame — not the parent scope.
+    const stmtBlockScopeVars: string[] | null = stmt._blockScopeVars
+      ? [...(stmt._blockScopeVars as string[])]
+      : null;
 
     // Recurse into nested structures first
     // Pass the full set of vars visible at this point
@@ -351,12 +363,21 @@ function instrumentBlock(
       body[i] = { type: 'BlockStatement', body: [push, stmt, pop] };
     }
 
+    // Remove block-scoped loop vars from the parent scope so they don't appear
+    // in captures after the loop ends (e.g. i in `for (let i...)` is loop-local).
+    if (stmtBlockScopeVars) {
+      for (const name of stmtBlockScopeVars) {
+        const idx = declaredSoFar.indexOf(name);
+        if (idx !== -1) declaredSoFar.splice(idx, 1);
+      }
+    }
+
     // For return/throw, insert capture BEFORE (capture after is dead code)
     if (stmt.type === 'ReturnStatement' || stmt.type === 'ThrowStatement') {
       const capture = buildCaptureExpression(declaredSoFar, line);
       body.splice(i, 0, capture);
       i += 2; // skip past inserted capture + the statement
-    } else if (shouldCaptureAfter(stmt)) {
+    } else if (shouldCaptureAfter(stmt) && !stmt._isBlockScopeInit) {
       const capture = buildCaptureExpression(declaredSoFar, line);
       body.splice(i + 1, 0, capture);
       i += 2; // skip past the original statement + inserted capture
@@ -691,10 +712,12 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
   }
 
   // If instrumentBlock pre-extracted a let/const for-init, pick up the stashed names.
-  // The vars are already in loopVars (via scopeVars), just need blockScopedVars populated.
+  // They are NOT in scopeVars (we skip adding them to the parent's declaredSoFar),
+  // so add them to both loopVars and blockScopedVars here.
   if (stmt._blockScopeVars) {
     for (const name of stmt._blockScopeVars as string[]) {
       if (!blockScopedVars.includes(name)) blockScopedVars.push(name);
+      if (!loopVars.includes(name)) loopVars.push(name);
     }
     delete stmt._blockScopeVars;
   }

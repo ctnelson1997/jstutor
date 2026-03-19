@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button, Form, Modal, Spinner } from 'react-bootstrap';
+import { useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { runCode } from '../engine/executor';
 import { encodeShareCode } from '../utils/share';
@@ -38,7 +39,11 @@ function IconSkipEnd() {
   );
 }
 
-export default function ControlBar() {
+export default function ControlBar({ embed = false }: { embed?: boolean }) {
+  const location = useLocation();
+  const openInJSTutorUrl = embed
+    ? `${window.location.origin}${window.location.pathname}#${location.pathname.replace('/embed/', '/share/')}`
+    : '';
   const code = useStore((s) => s.code);
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
@@ -53,6 +58,10 @@ export default function ControlBar() {
   const [shareUrl, setShareUrl] = useState('');
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  const [embedSnippet, setEmbedSnippet] = useState('');
+  const [showEmbedModal, setShowEmbedModal] = useState(false);
+  const [embedCopied, setEmbedCopied] = useState(false);
 
   const total = snapshots.length;
   const hasSteps = total > 0;
@@ -92,9 +101,31 @@ export default function ControlBar() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback: select the input so user can copy manually
       const input = document.getElementById('share-url-input') as HTMLInputElement | null;
       input?.select();
+    }
+  };
+
+  const handleEmbed = () => {
+    const encoded = encodeShareCode(code);
+    const embedUrl = `${window.location.origin}${window.location.pathname}#/embed/${encoded}`;
+    const lines = code.split('\n').length;
+    const height = Math.min(900, Math.max(400, lines * 22 + 280));
+    const maxWidth = Math.min(1200, height * 2);
+    const snippet = `<div style="resize: both; overflow: auto; width: min(100%, ${maxWidth}px); height: ${height}px;">\n  <iframe\n    src="${embedUrl}"\n    style="width: 100%; height: 100%; border: 1px solid #dee2e6; border-radius: 4px; display: block;"\n  ></iframe>\n</div>`;
+    setEmbedSnippet(snippet);
+    setEmbedCopied(false);
+    setShowEmbedModal(true);
+  };
+
+  const handleEmbedCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(embedSnippet);
+      setEmbedCopied(true);
+      setTimeout(() => setEmbedCopied(false), 2000);
+    } catch {
+      const ta = document.getElementById('embed-snippet-input') as HTMLTextAreaElement | null;
+      ta?.select();
     }
   };
 
@@ -163,9 +194,25 @@ export default function ControlBar() {
           </>
         )}
         <div className="vr" />
-        <Button variant="outline-secondary" size="sm" onClick={handleShare} title="Copy share link">
-          Share
-        </Button>
+        {embed ? (
+          <a
+            href={openInJSTutorUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-sm btn-outline-primary"
+          >
+            Edit in JSTutor ↗
+          </a>
+        ) : (
+          <>
+            <Button variant="outline-secondary" size="sm" onClick={handleShare} title="Copy share link">
+              Share
+            </Button>
+            <Button variant="outline-secondary" size="sm" onClick={handleEmbed} title="Embed this snippet">
+              Embed
+            </Button>
+          </>
+        )}
       </div>
       {hasSteps && (
         <Form.Range
@@ -201,6 +248,37 @@ export default function ControlBar() {
               style={{ whiteSpace: 'nowrap', minWidth: '80px' }}
             >
               {copied ? 'Copied!' : 'Copy link'}
+            </Button>
+          </div>
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={showEmbedModal} onHide={() => setShowEmbedModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title style={{ fontSize: '1rem' }}>Embed this snippet</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted mb-2" style={{ fontSize: '0.875rem' }}>
+            Paste this HTML into any webpage to embed an interactive visualization of your code.
+            Viewers will see the editor and can step through execution — no sign-in required.
+          </p>
+          <Form.Control
+            id="embed-snippet-input"
+            as="textarea"
+            readOnly
+            rows={5}
+            value={embedSnippet}
+            onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+            style={{ fontSize: '0.78rem', fontFamily: 'monospace', resize: 'none' }}
+          />
+          <div className="d-flex justify-content-end mt-2">
+            <Button
+              variant={embedCopied ? 'success' : 'outline-primary'}
+              size="sm"
+              onClick={handleEmbedCopy}
+              style={{ minWidth: '100px' }}
+            >
+              {embedCopied ? 'Copied!' : 'Copy snippet'}
             </Button>
           </div>
         </Modal.Body>
