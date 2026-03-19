@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Toast, ToastContainer, Button } from 'react-bootstrap';
 import AppNavbar from './components/AppNavbar';
+import ControlBar from './components/ControlBar';
 import EditorPanel from './components/EditorPanel';
 import VisualizationPanel from './components/VisualizationPanel';
 import { useStore } from './store/useStore';
@@ -10,14 +11,34 @@ export default function App() {
   const stepForward = useStore((s) => s.stepForward);
   const stepBackward = useStore((s) => s.stepBackward);
   const code = useStore((s) => s.code);
+  const snapshots = useStore((s) => s.snapshots);
 
   const shouldShowToast = localStorage.getItem('jstutor-hide-warning') !== 'true';
   const [showToast, setShowToast] = useState(false);
 
-  // Resizable split
+  // Resizable split (desktop only)
   const [splitPercent, setSplitPercent] = useState(40);
   const dragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Mobile detection & tab state
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 991px)').matches);
+  const [activeTab, setActiveTab] = useState<'editor' | 'viz'>('editor');
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 991px)');
+    const handler = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // Auto-switch to viz tab on mobile when visualization runs
+  const hasSnapshots = snapshots.length > 0;
+  useEffect(() => {
+    if (isMobile && hasSnapshots) {
+      setActiveTab('viz');
+    }
+  }, [isMobile, hasSnapshots]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     dragging.current = true;
@@ -39,7 +60,6 @@ export default function App() {
     document.body.style.cursor = '';
   }, []);
 
-  // Delay showing toast so it mounts hidden first, then fades in
   useEffect(() => {
     if (shouldShowToast) {
       const id = requestAnimationFrame(() => setShowToast(true));
@@ -50,10 +70,8 @@ export default function App() {
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept when typing in the editor
       const target = e.target as HTMLElement;
       if (target.closest('.cm-editor')) {
-        // Only intercept Shift+Enter inside the editor
         if (e.key === 'Enter' && e.shiftKey) {
           e.preventDefault();
           runCode(code);
@@ -80,27 +98,52 @@ export default function App() {
   return (
     <>
       <AppNavbar />
-      <div
-        className="main-layout"
-        ref={containerRef}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-      >
-        <div className="editor-column border-end" style={{ width: `${splitPercent}%` }}>
-          <EditorPanel />
+
+      {isMobile ? (
+        <div className="mobile-layout">
+          <ControlBar />
+          <div className="mobile-tab-bar">
+            <button
+              className={`mobile-tab${activeTab === 'editor' ? ' active' : ''}`}
+              onClick={() => setActiveTab('editor')}
+            >
+              Editor
+            </button>
+            <button
+              className={`mobile-tab${activeTab === 'viz' ? ' active' : ''}`}
+              onClick={() => setActiveTab('viz')}
+            >
+              Visualization
+            </button>
+          </div>
+          <div className="mobile-panel">
+            {activeTab === 'editor' ? <EditorPanel /> : <VisualizationPanel />}
+          </div>
         </div>
+      ) : (
         <div
-          className="split-divider"
-          onPointerDown={onPointerDown}
-        />
-        <div className="viz-column" style={{ width: `${100 - splitPercent}%` }}>
-          <VisualizationPanel />
+          className="main-layout"
+          ref={containerRef}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          <div className="editor-column border-end" style={{ width: `${splitPercent}%` }}>
+            <EditorPanel />
+          </div>
+          <div
+            className="split-divider"
+            onPointerDown={onPointerDown}
+          />
+          <div className="viz-column" style={{ width: `${100 - splitPercent}%` }}>
+            <ControlBar />
+            <VisualizationPanel />
+          </div>
         </div>
-      </div>
+      )}
 
       <ToastContainer position="bottom-end" className="p-3" style={{ zIndex: 1080 }}>
         <Toast show={showToast} onClose={() => setShowToast(false)} animation>
-          <Toast.Header closeButton >
+          <Toast.Header closeButton>
             <strong className="me-auto">⚠️ Experimental Tool</strong>
           </Toast.Header>
           <Toast.Body>

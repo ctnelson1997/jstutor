@@ -6,7 +6,8 @@
       "Bash(npx tsc:*)",
       "Bash(node --import tsx -e \":*)",
       "Bash(npx tsx -e \":*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

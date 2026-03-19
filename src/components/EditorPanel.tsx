@@ -86,14 +86,16 @@ export default function EditorPanel() {
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
   const error = useStore((s) => s.error);
+  const reset = useStore((s) => s.reset);
 
   const extensions = useMemo(() => [javascript(), highlightField, conditionField], []);
 
   const onChange = useCallback(
     (value: string) => {
+      if (snapshots.length > 0) reset();
       setCode(value);
     },
-    [setCode],
+    [setCode, reset, snapshots.length],
   );
 
   // Determine which line to highlight

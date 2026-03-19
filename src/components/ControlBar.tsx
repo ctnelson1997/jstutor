@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Form, Modal, Spinner } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
 import { runCode } from '../engine/executor';
@@ -73,6 +73,18 @@ export default function ControlBar() {
     setCopied(false);
     setShowShareModal(true);
   };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        handleShare();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   const handleCopy = async () => {
     try {

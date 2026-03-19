@@ -1,5 +1,6 @@
 export interface CodeExample {
   title: string;
+  slug: string;
   category: string;
   code: string;
 }
@@ -8,6 +9,7 @@ export const EXAMPLES: CodeExample[] = [
   // ── Basics ──
   {
     title: 'Variables & Types',
+    slug: 'variables-types',
     category: 'Basics',
     code: `let num = 42;
 let str = "hello";
@@ -18,6 +20,7 @@ console.log(num, str, bool, nothing, undef);`,
   },
   {
     title: 'For Loop',
+    slug: 'for-loop',
     category: 'Basics',
     code: `let sum = 0;
 for (let i = 1; i <= 5; i++) {
@@ -27,6 +30,7 @@ console.log("Sum:", sum);`,
   },
   {
     title: 'While Loop',
+    slug: 'while-loop',
     category: 'Basics',
     code: `let n = 1;
 while (n < 100) {
@@ -36,6 +40,7 @@ console.log(n);`,
   },
   {
     title: 'Conditionals',
+    slug: 'conditionals',
     category: 'Basics',
     code: `let age = 20;
 let category;
@@ -53,6 +58,7 @@ console.log(category);`,
   // ── Functions ──
   {
     title: 'Recursion (Fibonacci)',
+    slug: 'recursion-fibonacci',
     category: 'Functions',
     code: `function fibonacci(n) {
   if (n <= 1) return n;
@@ -64,6 +70,7 @@ console.log("fib(5) =", result);`,
   },
   {
     title: 'Closures',
+    slug: 'closures',
     category: 'Functions',
     code: `function makeCounter() {
   let count = 0;
@@ -80,6 +87,7 @@ console.log(counter()); // 3`,
   },
   {
     title: 'Higher-Order Functions',
+    slug: 'higher-order-functions',
     category: 'Functions',
     code: `let numbers = [1, 2, 3, 4, 5];
 
@@ -98,6 +106,7 @@ console.log("evens:", evens);`,
   // ── Data Structures ──
   {
     title: 'Linked List',
+    slug: 'linked-list',
     category: 'Data Structures',
     code: `function createNode(value, next) {
   return { value: value, next: next };
@@ -117,6 +126,7 @@ while (current !== null) {
   },
   {
     title: 'Stack (Array)',
+    slug: 'stack-array',
     category: 'Data Structures',
     code: `let stack = [];
 
@@ -133,6 +143,7 @@ console.log("Stack now:", stack);`,
   // ── Objects & Classes ──
   {
     title: 'Objects & Methods',
+    slug: 'objects-methods',
     category: 'Objects & Classes',
     code: `let person = {
   name: "Alice",
@@ -148,6 +159,7 @@ console.log(person.name, "is", person.age);`,
   },
   {
     title: 'Classes',
+    slug: 'classes',
     category: 'Objects & Classes',
     code: `class Animal {
   constructor(name, sound) {

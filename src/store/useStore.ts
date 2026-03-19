@@ -24,18 +24,10 @@ export interface JSTutorState {
   reset: () => void;
 }
 
-const DEFAULT_CODE = `// Welcome to JSTutor! Write some JavaScript and click "Visualize"
-let x = 5;
-let y = 10;
-let sum = x + y;
-console.log(sum);
+export const SANDBOX_CODE = `// Write your code below!
+let x = 1;`;
 
-let arr = [1, 2, 3];
-for (let i = 0; i < arr.length; i++) {
-  arr[i] = arr[i] * 2;
-}
-console.log(arr);
-`;
+const DEFAULT_CODE = SANDBOX_CODE;
 
 export const useStore = create<JSTutorState>((set, get) => ({
   // ── Editor ──

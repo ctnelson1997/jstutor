@@ -1,5 +1,4 @@
 import { useRef } from 'react';
-import ControlBar from './ControlBar';
 import FramesView from './FramesView';
 import HeapView from './HeapView';
 import ConsolePanel from './ConsolePanel';
@@ -12,7 +11,6 @@ export default function VisualizationPanel() {
 
   return (
     <div className="d-flex flex-column h-100">
-      <ControlBar />
       <div className="viz-scroll p-2" ref={vizRef} style={{ position: 'relative' }}>
         {snapshots.length === 0 ? (
           <div className="text-center text-muted mt-5">
