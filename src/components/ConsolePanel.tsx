@@ -17,36 +17,37 @@ export default function ConsolePanel() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [stdout]);
 
-  // Drag-to-resize logic
-  const onMouseDown = useCallback((e: React.MouseEvent) => {
+  // Drag-to-resize logic (pointer events work on both mouse and touch)
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
     setDragging(true);
     const startY = e.clientY;
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
     const startHeight = wrapper.getBoundingClientRect().height;
 
-    const onMouseMove = (ev: MouseEvent) => {
+    const onPointerMove = (ev: PointerEvent) => {
       const delta = startY - ev.clientY; // dragging up = bigger
       const newHeight = Math.max(60, Math.min(window.innerHeight * 0.6, startHeight + delta));
       wrapper.style.height = `${newHeight}px`;
     };
 
-    const onMouseUp = () => {
+    const onPointerUp = () => {
       setDragging(false);
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
+      document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerup', onPointerUp);
     };
 
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
   }, []);
 
   return (
     <div ref={wrapperRef} className="console-panel-wrapper">
       <div
         className={`console-resize-handle${dragging ? ' active' : ''}`}
-        onMouseDown={onMouseDown}
+        onPointerDown={onPointerDown}
         role="separator"
         aria-orientation="horizontal"
         aria-label="Resize console panel. Use up/down arrow keys to adjust height."

@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorView, Decoration, WidgetType, type DecorationSet } from '@codemirror/view';
@@ -88,7 +88,40 @@ export default function EditorPanel() {
   const error = useStore((s) => s.error);
   const reset = useStore((s) => s.reset);
 
-  const extensions = useMemo(() => [javascript(), highlightField, conditionField], []);
+  // Make the editor fill its flex container and scroll when content exceeds it.
+  const fillHeight = useMemo(
+    () =>
+      EditorView.theme({
+        '&': { height: '100%' },
+        '.cm-scroller': { overflow: 'auto' },
+      }),
+    [],
+  );
+
+  const extensions = useMemo(() => [javascript(), highlightField, conditionField, fillHeight], [fillHeight]);
+
+  // Pad the document with trailing newlines so line numbers fill the
+  // visible editor area. A ResizeObserver keeps the count in sync with
+  // the actual container height.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [minLines, setMinLines] = useState(25);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      // ~20px per line is a safe approximation for CodeMirror's default font
+      setMinLines(Math.ceil(el.clientHeight / 20) + 1);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const paddedCode = useMemo(() => {
+    const lineCount = code.split('\n').length;
+    if (lineCount >= minLines) return code;
+    return code + '\n'.repeat(minLines - lineCount);
+  }, [code, minLines]);
 
   const onChange = useCallback(
     (value: string) => {
@@ -156,9 +189,9 @@ export default function EditorPanel() {
       )}
 
       {/* CodeMirror editor */}
-      <div className="flex-grow-1" style={{ minHeight: 0 }}>
+      <div ref={wrapperRef} className="flex-grow-1" style={{ minHeight: 0 }}>
         <CodeMirror
-          value={code}
+          value={paddedCode}
           extensions={extensions}
           onChange={onChange}
           onCreateEditor={onCreateEditor}

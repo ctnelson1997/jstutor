@@ -17,7 +17,10 @@ export default function App({ embed = false }: { embed?: boolean }) {
 
   const [splitPercent, setSplitPercent] = useState(40);
   const dragging = useRef(false);
+  const splitPercentRef = useRef(40);
   const containerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
+  const vizRef = useRef<HTMLDivElement>(null);
   const [isStacked, setIsStacked] = useState(() => window.matchMedia('(max-width: 700px)').matches);
 
   useEffect(() => {
@@ -40,13 +43,25 @@ export default function App({ embed = false }: { embed?: boolean }) {
     const pct = isStacked
       ? ((e.clientY - rect.top) / rect.height) * 100
       : ((e.clientX - rect.left) / rect.width) * 100;
-    setSplitPercent(Math.min(80, Math.max(20, pct)));
+    const clamped = Math.min(80, Math.max(20, pct));
+    splitPercentRef.current = clamped;
+    // Direct DOM update avoids React re-renders during drag
+    if (editorRef.current && vizRef.current) {
+      if (isStacked) {
+        editorRef.current.style.height = `${clamped}%`;
+        vizRef.current.style.height = `${100 - clamped}%`;
+      } else {
+        editorRef.current.style.width = `${clamped}%`;
+        vizRef.current.style.width = `${100 - clamped}%`;
+      }
+    }
   }, [isStacked]);
 
   const onPointerUp = useCallback(() => {
     dragging.current = false;
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+    setSplitPercent(splitPercentRef.current);
   }, []);
 
   useEffect(() => {
@@ -95,6 +110,7 @@ export default function App({ embed = false }: { embed?: boolean }) {
         onPointerUp={onPointerUp}
       >
         <div
+          ref={editorRef}
           className="editor-column border-end"
           style={isStacked ? { width: '100%', height: `${splitPercent}%` } : { width: `${splitPercent}%` }}
         >
@@ -106,6 +122,7 @@ export default function App({ embed = false }: { embed?: boolean }) {
           onPointerDown={onPointerDown}
         />
         <div
+          ref={vizRef}
           className="viz-column"
           style={isStacked ? { width: '100%', height: `${100 - splitPercent}%` } : { width: `${100 - splitPercent}%` }}
         >

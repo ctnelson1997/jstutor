@@ -36,6 +36,7 @@ html, body, #root {
   cursor: col-resize;
   background: #dee2e6;
   transition: background 0.15s;
+  touch-action: none;
 }
 
 .split-divider:hover,
@@ -85,6 +86,7 @@ html, body, #root {
   background: transparent;
   flex-shrink: 0;
   transition: background 0.15s;
+  touch-action: none;
 }
 
 .console-resize-handle:hover,
