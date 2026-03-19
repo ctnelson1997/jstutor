@@ -22,6 +22,14 @@ type AnyNode = any;
 // buildCaptureExpression reads this to emit a third argument to __capture__.
 let _parentVarNames: string[] | null = null;
 
+// Tracks function nesting depth so we can identify closure variables.
+let _functionDepth = 0;
+
+// When inside a nested function, holds the names of variables closed over
+// from enclosing function scope(s). buildCaptureExpression reads this to
+// emit a fourth argument to __capture__.
+let _closureVarNames: string[] | null = null;
+
 /**
  * Instrument a user's source code for step-by-step state capture.
  * Returns the instrumented source string.
@@ -146,6 +154,25 @@ function buildCaptureExpression(varNames: string[], line: number): AnyNode {
     });
   }
 
+  // If inside a closure, pass closed-over variables as fourth argument
+  // so the runtime can display them separately on the frame.
+  if (_closureVarNames && _closureVarNames.length > 0) {
+    // Ensure third arg exists (null placeholder if no block scope)
+    if (!_parentVarNames) {
+      args.push({ type: 'Literal', value: null, raw: 'null' });
+    }
+    const closureProps = _closureVarNames.map((name) => ({
+      type: 'Property',
+      key: { type: 'Identifier', name },
+      value: { type: 'Identifier', name },
+      kind: 'init',
+      shorthand: true,
+      computed: false,
+      method: false,
+    }));
+    args.push({ type: 'ObjectExpression', properties: closureProps });
+  }
+
   return {
     type: 'ExpressionStatement',
     expression: {
@@ -157,7 +184,7 @@ function buildCaptureExpression(varNames: string[], line: number): AnyNode {
   };
 }
 
-function buildPushFrame(name: string, paramNames: string[], isBlockScope = false): AnyNode {
+function buildPushFrame(name: string, paramNames: string[], isBlockScope = false, closureVarNames?: string[] | null): AnyNode {
   const properties = paramNames.map((n) => ({
     type: 'Property',
     key: { type: 'Identifier', name: n },
@@ -175,6 +202,23 @@ function buildPushFrame(name: string, paramNames: string[], isBlockScope = false
 
   if (isBlockScope) {
     args.push({ type: 'Literal', value: true });
+  }
+
+  // Pass closed-over variables as fourth argument
+  if (closureVarNames && closureVarNames.length > 0) {
+    if (!isBlockScope) {
+      args.push({ type: 'Literal', value: false });
+    }
+    const closureProps = closureVarNames.map((n) => ({
+      type: 'Property',
+      key: { type: 'Identifier', name: n },
+      value: { type: 'Identifier', name: n },
+      kind: 'init',
+      shorthand: true,
+      computed: false,
+      method: false,
+    }));
+    args.push({ type: 'ObjectExpression', properties: closureProps });
   }
 
   return {
@@ -586,6 +630,23 @@ function instrumentFunction(fn: AnyNode, _parentVars: string[]): void {
   const savedParentVarNames = _parentVarNames;
   _parentVarNames = null;
 
+  // Save and update closure tracking state
+  const savedClosureVarNames = _closureVarNames;
+  const savedFunctionDepth = _functionDepth;
+  _functionDepth++;
+
+  // If inside another function, the outer scope vars are closure variables.
+  // Also inherit any closure vars from the enclosing function (for deep nesting).
+  const outerClosureVars = _functionDepth > 1 ? _parentVars.slice() : null;
+  if (outerClosureVars && savedClosureVarNames) {
+    for (const name of savedClosureVarNames) {
+      if (!outerClosureVars.includes(name)) {
+        outerClosureVars.push(name);
+      }
+    }
+  }
+  _closureVarNames = outerClosureVars;
+
   const name = fn.id?.name || '<anonymous>';
   const paramNames: string[] = [];
   for (const param of fn.params) {
@@ -620,7 +681,7 @@ function instrumentFunction(fn: AnyNode, _parentVars: string[]): void {
   instrumentBlock(body, fnScopeVars, true);
 
   // Insert __pushFrame__ at the beginning of the function body
-  body.unshift(buildPushFrame(name, paramNames));
+  body.unshift(buildPushFrame(name, paramNames, false, _closureVarNames));
 
   // Wrap return values so the frame pops AFTER the expression evaluates
   wrapReturnsWithPopFrame(body);
@@ -628,6 +689,9 @@ function instrumentFunction(fn: AnyNode, _parentVars: string[]): void {
   // Add __popFrame__ at the very end (for functions that fall through)
   body.push(buildPopFrame());
 
+  // Restore saved state
+  _functionDepth = savedFunctionDepth;
+  _closureVarNames = savedClosureVarNames;
   _parentVarNames = savedParentVarNames;
 }
 
@@ -766,9 +830,20 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
     // Set parent var context so captures distribute vars correctly.
     // Exclude block-scoped loop vars — they belong to the block frame, not the parent.
     const savedParentVarNames = _parentVarNames;
-    _parentVarNames = scopeVars.filter((n: string) => !blockScopedVars.includes(n));
 
-    instrumentBlock(stmt.body.body, loopVars, false);
+    // When nesting block scopes (savedParentVarNames already set), exclude
+    // ancestor-frame variables. The two-frame distribution in __capture__
+    // would misplace them in the immediate parent rather than their actual
+    // owning frame. They are already captured correctly there.
+    const ancestorVars = savedParentVarNames || [];
+    _parentVarNames = scopeVars.filter(
+      (n: string) => !blockScopedVars.includes(n) && !ancestorVars.includes(n),
+    );
+    const effectiveLoopVars = loopVars.filter(
+      (n: string) => !ancestorVars.includes(n),
+    );
+
+    instrumentBlock(stmt.body.body, effectiveLoopVars, false);
 
     _parentVarNames = savedParentVarNames;
   } else {

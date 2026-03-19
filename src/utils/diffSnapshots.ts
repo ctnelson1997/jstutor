@@ -27,6 +27,11 @@ export function getChangedKeys(
     for (const v of frame.variables) {
       prevVarMap.set(`var:${frame.name}:${v.name}`, serializeValue(v.value));
     }
+    if (frame.closureVars) {
+      for (const v of frame.closureVars) {
+        prevVarMap.set(`closure:${frame.name}:${v.name}`, serializeValue(v.value));
+      }
+    }
   }
   for (const frame of curr.callStack) {
     for (const v of frame.variables) {
@@ -34,6 +39,15 @@ export function getChangedKeys(
       const prevVal = prevVarMap.get(key);
       if (prevVal === undefined || prevVal !== serializeValue(v.value)) {
         changed.add(key);
+      }
+    }
+    if (frame.closureVars) {
+      for (const v of frame.closureVars) {
+        const key = `closure:${frame.name}:${v.name}`;
+        const prevVal = prevVarMap.get(key);
+        if (prevVal === undefined || prevVal !== serializeValue(v.value)) {
+          changed.add(key);
+        }
       }
     }
   }

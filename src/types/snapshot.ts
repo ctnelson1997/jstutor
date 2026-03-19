@@ -51,6 +51,7 @@ export interface StackFrame {
   name: string;
   variables: Variable[];
   isBlockScope?: boolean;
+  closureVars?: Variable[];
 }
 
 // ── Execution snapshot ──

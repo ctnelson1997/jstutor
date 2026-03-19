@@ -178,9 +178,16 @@ function __collectHeap__(stackSnapshot) {
   }
   for (var f = 0; f < stackSnapshot.length; f++) {
     var vars = stackSnapshot[f].variables;
-    if (!vars || !vars.length) continue;
-    for (var v = 0; v < vars.length; v++) {
-      visit(vars[v].value);
+    if (vars && vars.length) {
+      for (var v = 0; v < vars.length; v++) {
+        visit(vars[v].value);
+      }
+    }
+    var cvars = stackSnapshot[f].closureVars;
+    if (cvars && cvars.length) {
+      for (var cv = 0; cv < cvars.length; cv++) {
+        visit(cvars[cv].value);
+      }
     }
   }
   return result;
@@ -200,6 +207,7 @@ function __condition__(value, line, expression) {
       variables: fr.variables || []
     };
     if (fr.isBlockScope) ent.isBlockScope = true;
+    if (fr.closureVars && fr.closureVars.length > 0) ent.closureVars = fr.closureVars;
     stackSnapshot.push(ent);
   }
 
@@ -217,11 +225,42 @@ function __condition__(value, line, expression) {
 
 // ── Capture ──
 
-function __capture__(line, vars, parentVarNames) {
+function __capture__(line, vars, parentVarNames, closureVars) {
   if (__snapshots__.length >= __MAX_SNAPSHOTS) return;
 
   var heapObjects = [];
   var visited = new Set();
+
+  // Update closure vars on the nearest function (non-block-scope) frame
+  if (closureVars) {
+    var funcFrame = null;
+    for (var fi = __callStack__.length - 1; fi >= 0; fi--) {
+      if (!__callStack__[fi].isBlockScope) {
+        funcFrame = __callStack__[fi];
+        break;
+      }
+    }
+    if (funcFrame) {
+      var closureEntries = [];
+      var cKeys = Object.keys(closureVars);
+      for (var ci = 0; ci < cKeys.length; ci++) {
+        var cvName = cKeys[ci];
+        if (cvName.startsWith("__") && cvName.endsWith("__")) continue;
+        try {
+          closureEntries.push({
+            name: cvName,
+            value: __serializeValue__(closureVars[cvName], heapObjects, visited)
+          });
+        } catch(e) {
+          closureEntries.push({
+            name: cvName,
+            value: { type: "string", value: "[error]" }
+          });
+        }
+      }
+      funcFrame.closureVars = closureEntries;
+    }
+  }
 
   if (parentVarNames && __callStack__.length >= 2) {
     // Block-scope mode: distribute vars between the top (block) frame
@@ -283,6 +322,7 @@ function __capture__(line, vars, parentVarNames) {
       variables: frame.variables || []
     };
     if (frame.isBlockScope) entry.isBlockScope = true;
+    if (frame.closureVars && frame.closureVars.length > 0) entry.closureVars = frame.closureVars;
     stackSnapshot.push(entry);
   }
 
@@ -297,7 +337,7 @@ function __capture__(line, vars, parentVarNames) {
 
 // ── Frame management ──
 
-function __pushFrame__(name, params, isBlockScope) {
+function __pushFrame__(name, params, isBlockScope, closureVars) {
   var frame = { name: name, variables: [], isBlockScope: !!isBlockScope };
   // Serialize params as initial frame variables
   var heapObjects = [];
@@ -315,6 +355,25 @@ function __pushFrame__(name, params, isBlockScope) {
         value: { type: "string", value: "[error]" }
       });
     }
+  }
+  // Serialize closure variables from enclosing scope(s)
+  if (closureVars) {
+    var closureEntries = [];
+    var cKeys = Object.keys(closureVars);
+    for (var ci = 0; ci < cKeys.length; ci++) {
+      try {
+        closureEntries.push({
+          name: cKeys[ci],
+          value: __serializeValue__(closureVars[cKeys[ci]], heapObjects, visited)
+        });
+      } catch(e) {
+        closureEntries.push({
+          name: cKeys[ci],
+          value: { type: "string", value: "[error]" }
+        });
+      }
+    }
+    if (closureEntries.length > 0) frame.closureVars = closureEntries;
   }
   __callStack__.push(frame);
 }
@@ -342,6 +401,7 @@ function __popFrame__(retVal, line) {
           variables: j === __callStack__.length - 1 ? retVars : (frame.variables || [])
         };
         if (frame.isBlockScope) entry2.isBlockScope = true;
+        if (frame.closureVars && frame.closureVars.length > 0) entry2.closureVars = frame.closureVars;
         stackSnapshot.push(entry2);
       }
       __snapshots__.push({

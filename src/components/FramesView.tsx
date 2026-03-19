@@ -129,12 +129,43 @@ function BlockScopeSection({ node, changedKeys, step }: { node: BlockScopeNode; 
   );
 }
 
+/** Render a closure variable table (uses "closure:" key prefix for change detection). */
+function ClosureVariableTable({ frame, changedKeys, step }: { frame: StackFrame; changedKeys: Set<string>; step: number }) {
+  if (!frame.closureVars || frame.closureVars.length === 0) return null;
+
+  return (
+    <table className="w-100">
+      <tbody>
+        {frame.closureVars.map((v) => {
+          const isChanged = changedKeys.has(`closure:${frame.name}:${v.name}`);
+          return (
+            <tr key={v.name}>
+              <td
+                className="fw-semibold"
+                style={{ fontFamily: 'monospace' }}
+              >
+                {v.name}
+              </td>
+              <td className="text-end">
+                <span key={isChanged ? step : undefined} className={isChanged ? 'value-changed' : undefined}>
+                  <ValueDisplay value={v.value} />
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
 function FrameCard({ group, changedKeys, step }: { group: FrameGroup; changedKeys: Set<string>; step: number }) {
   const isGlobal = group.index === 0;
   const variant = isGlobal ? 'secondary' : 'primary';
   const hasParentVars = group.frame.variables.length > 0;
   const hasBlockScopes = group.blockScopes.length > 0;
-  const isEmpty = !hasParentVars && !hasBlockScopes;
+  const hasClosure = !!(group.frame.closureVars && group.frame.closureVars.length > 0);
+  const isEmpty = !hasParentVars && !hasBlockScopes && !hasClosure;
 
   return (
     <Card className="frame-card mb-2" border={variant}>
@@ -146,6 +177,12 @@ function FrameCard({ group, changedKeys, step }: { group: FrameGroup; changedKey
           <em className="text-muted" style={{ fontSize: '0.8rem' }}>No variables</em>
         ) : (
           <>
+            {hasClosure && (
+              <div className="closure-scope-section">
+                <div className="closure-scope-label">Closure</div>
+                <ClosureVariableTable frame={group.frame} changedKeys={changedKeys} step={step} />
+              </div>
+            )}
             <VariableTable frame={group.frame} changedKeys={changedKeys} step={step} />
             {group.blockScopes.map((node, i) => (
               <BlockScopeSection key={`${node.frame.name}-${i}`} node={node} changedKeys={changedKeys} step={step} />

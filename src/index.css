@@ -224,6 +224,25 @@ html, body, #root {
   margin-bottom: 0.1rem;
 }
 
+/* Closure scope section (similar to block scope but visually distinct) */
+.closure-scope-section {
+  margin-bottom: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  border-left: 2px solid #6f42c1;
+  margin-left: 0.15rem;
+  background: rgba(111, 66, 193, 0.04);
+  border-radius: 0 3px 3px 0;
+}
+
+.closure-scope-label {
+  font-size: 0.65rem;
+  color: #6f42c1;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.1rem;
+}
+
 /* Heap object cards */
 .heap-card {
   font-size: 0.8rem;
