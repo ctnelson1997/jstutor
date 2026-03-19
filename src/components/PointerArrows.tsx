@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { memo, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 
 interface Arrow {
@@ -16,8 +16,9 @@ interface Arrow {
  * Must be rendered inside the scrollable viz container so that
  * positions are relative to the same coordinate space.
  */
-export default function PointerArrows({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+export default memo(function PointerArrows({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const rafId = useRef(0);
   const currentStep = useStore((s) => s.currentStep);
   const snapshots = useStore((s) => s.snapshots);
 
@@ -91,6 +92,16 @@ export default function PointerArrows({ containerRef }: { containerRef: React.Re
     `;
   }, [computeArrows, containerRef]);
 
+  // RAF-gated redraw: deduplicates scroll, resize, and mutation events
+  // so at most one draw() runs per animation frame.
+  const scheduleRedraw = useCallback(() => {
+    if (rafId.current) return;
+    rafId.current = requestAnimationFrame(() => {
+      rafId.current = 0;
+      draw();
+    });
+  }, [draw]);
+
   useEffect(() => {
     // Redraw after a microtask so DOM layout is settled
     const raf = requestAnimationFrame(draw);
@@ -100,21 +111,31 @@ export default function PointerArrows({ containerRef }: { containerRef: React.Re
   // Redraw on resize, scroll, and DOM mutations (e.g. heap filter toggling cards)
   useEffect(() => {
     const container = containerRef.current;
-    window.addEventListener('resize', draw);
-    container?.addEventListener('scroll', draw);
+    const svg = svgRef.current;
+    window.addEventListener('resize', scheduleRedraw);
+    container?.addEventListener('scroll', scheduleRedraw, { passive: true });
 
     let observer: MutationObserver | undefined;
     if (container) {
-      observer = new MutationObserver(() => requestAnimationFrame(draw));
+      observer = new MutationObserver((mutations) => {
+        // Ignore mutations inside our own SVG to prevent an infinite loop
+        // (draw sets innerHTML which triggers MutationObserver)
+        if (svg && mutations.every((m) => svg.contains(m.target))) return;
+        scheduleRedraw();
+      });
       observer.observe(container, { childList: true, subtree: true });
     }
 
     return () => {
-      window.removeEventListener('resize', draw);
-      container?.removeEventListener('scroll', draw);
+      window.removeEventListener('resize', scheduleRedraw);
+      container?.removeEventListener('scroll', scheduleRedraw);
       observer?.disconnect();
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current);
+        rafId.current = 0;
+      }
     };
-  }, [draw, containerRef]);
+  }, [scheduleRedraw, containerRef]);
 
   return (
     <svg
@@ -122,4 +143,4 @@ export default function PointerArrows({ containerRef }: { containerRef: React.Re
       className="pointer-arrows-svg"
     />
   );
-}
+});

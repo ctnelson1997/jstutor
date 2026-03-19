@@ -24,7 +24,7 @@ export default function AppNavbar() {
       <Navbar.Toggle aria-controls="navbar-nav" />
       <Navbar.Collapse id="navbar-nav">
         <Nav className="me-auto">
-          <Nav.Link as="button" onClick={handleSandbox}>Sandbox</Nav.Link>
+          <Nav.Link as="button" className="text-start" onClick={handleSandbox}>Sandbox</Nav.Link>
           <NavDropdown title="Examples" id="nav-examples">
             {categories.map((cat, i) => (
               <>

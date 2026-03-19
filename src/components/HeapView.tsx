@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { Card, ButtonGroup, Button } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
 import type { HeapObject, RuntimeValue, StackFrame } from '../types/snapshot';
@@ -92,18 +92,19 @@ function FunctionDisplay({ obj }: { obj: HeapObject }) {
   );
 }
 
+const typeLabels: Record<string, string> = {
+  array: 'Array',
+  object: 'Object',
+  function: 'Function',
+  class: 'Class',
+  date: 'Date',
+  regexp: 'RegExp',
+  map: 'Map',
+  set: 'Set',
+  error: 'Error',
+};
+
 function HeapCard({ obj, changedKeys, step }: { obj: HeapObject; changedKeys: Set<string>; step: number }) {
-  const typeLabels: Record<string, string> = {
-    array: 'Array',
-    object: 'Object',
-    function: 'Function',
-    class: 'Class',
-    date: 'Date',
-    regexp: 'RegExp',
-    map: 'Map',
-    set: 'Set',
-    error: 'Error',
-  };
 
   const label = obj.label
     ? `${typeLabels[obj.objectType] || obj.objectType}: ${obj.label}`
@@ -148,7 +149,7 @@ function refsInFrame(frame: StackFrame): Set<string> {
   return ids;
 }
 
-export default function HeapView() {
+export default memo(function HeapView() {
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
   const [filter, setFilter] = useState<HeapFilter>('all');
@@ -209,4 +210,4 @@ export default function HeapView() {
       )}
     </div>
   );
-}
+});

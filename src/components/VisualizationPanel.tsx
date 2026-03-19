@@ -6,13 +6,13 @@ import PointerArrows from './PointerArrows';
 import { useStore } from '../store/useStore';
 
 export default function VisualizationPanel() {
-  const snapshots = useStore((s) => s.snapshots);
+  const hasSnapshots = useStore((s) => s.snapshots.length > 0);
   const vizRef = useRef<HTMLDivElement>(null);
 
   return (
     <div className="d-flex flex-column h-100">
       <div className="viz-scroll p-2" ref={vizRef} style={{ position: 'relative' }}>
-        {snapshots.length === 0 ? (
+        {!hasSnapshots ? (
           <div className="text-center text-muted mt-5">
             <p className="fw-semibold fs-5">Memory Visualization</p>
             <p>Write some code and click <strong>Visualize</strong> to see how it runs step by step.</p>

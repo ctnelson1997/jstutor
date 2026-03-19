@@ -1,7 +1,7 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { memo, useEffect, useRef, useCallback, useState } from 'react';
 import { useStore } from '../store/useStore';
 
-export default function ConsolePanel() {
+export default memo(function ConsolePanel() {
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -80,4 +80,4 @@ export default function ConsolePanel() {
       </div>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Card } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
 import type { RuntimeValue, StackFrame } from '../types/snapshot';
@@ -157,7 +157,7 @@ function FrameCard({ group, changedKeys, step }: { group: FrameGroup; changedKey
   );
 }
 
-export default function FramesView() {
+export default memo(function FramesView() {
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
 
@@ -166,15 +166,14 @@ export default function FramesView() {
     [snapshots, currentStep],
   );
 
-  if (snapshots.length === 0) return null;
+  const snapshot = snapshots.length > 0 ? snapshots[currentStep] : null;
 
-  const snapshot = snapshots[currentStep];
+  const reversed = useMemo(() => {
+    if (!snapshot) return [];
+    return [...groupFrames(snapshot.callStack)].reverse();
+  }, [snapshot]);
+
   if (!snapshot) return null;
-
-  const groups = groupFrames(snapshot.callStack);
-
-  // Render groups in reverse order (most recent call on top)
-  const reversed = [...groups].reverse();
 
   return (
     <div>
@@ -183,4 +182,4 @@ export default function FramesView() {
       ))}
     </div>
   );
-}
+});
