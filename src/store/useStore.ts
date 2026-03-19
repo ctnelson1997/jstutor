@@ -12,6 +12,10 @@ export interface JSTutorState {
   isRunning: boolean;
   error: { message: string; line?: number } | null;
 
+  // ── View options ──
+  hideFunctions: boolean;
+  setHideFunctions: (hide: boolean) => void;
+
   // ── Actions ──
   setSnapshots: (snapshots: ExecutionSnapshot[]) => void;
   setCurrentStep: (step: number) => void;
@@ -39,6 +43,10 @@ export const useStore = create<JSTutorState>((set, get) => ({
   currentStep: 0,
   isRunning: false,
   error: null,
+
+  // ── View options ──
+  hideFunctions: false,
+  setHideFunctions: (hide) => set({ hideFunctions: hide }),
 
   // ── Actions ──
   setSnapshots: (snapshots) => set({ snapshots, currentStep: 0, error: null }),

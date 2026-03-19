@@ -57,16 +57,16 @@ console.log(category);`,
 
   // ── Functions ──
   {
-    title: 'Recursion (Fibonacci)',
-    slug: 'recursion-fibonacci',
+    title: 'Recursion (Factorial)',
+    slug: 'recursion-factorial',
     category: 'Functions',
-    code: `function fibonacci(n) {
-  if (n <= 1) return n;
-  return fibonacci(n - 1) + fibonacci(n - 2);
+    code: `function factorial(n) {
+  if (n <= 1) return 1;
+  return n * factorial(n - 1);
 }
 
-let result = fibonacci(5);
-console.log("fib(5) =", result);`,
+let result = factorial(5);
+console.log("5! =", result);`,
   },
   {
     title: 'Closures',

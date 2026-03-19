@@ -12,10 +12,13 @@ JSTutor instruments your JavaScript code using an AST transform, runs it inside 
 
 At each step the visualizer shows:
 
-- **Call Stack** — active function frames and block scopes with live variable values
-- **Heap** — objects, arrays, and functions in memory with pointer arrows linking references
+- **Call Stack** — active function frames and block scopes with live variable values, closures, and `this` context
+- **Heap** — objects, arrays, functions, classes, Maps, Sets, and more displayed as cards with pointer arrows linking references (filterable by all frames / current frame, with an option to hide function objects)
 - **Console** — output from `console.log` / `console.warn` / `console.error`
-- **Condition badges** — `true`/`false` pills annotated directly in the editor for `if`/`else if` tests
+- **Condition badges** — `true`/`false` pills annotated directly in the editor for `if`/`else if` and loop conditions
+- **Value change detection** — variables that changed between steps flash yellow so you can spot what just updated
+- **Sub-line highlighting** — for-loop init, condition, and update clauses are individually highlighted as they execute
+- **Share & embed** — compress your code into a URL to share, or generate an embeddable `<iframe>` snippet (view options like "hide functions" are preserved in the link)
 
 Everything runs in your browser. No server, no account, no data collection.
 
@@ -29,9 +32,9 @@ User Code (CodeMirror editor)
         ▼
 Instrumenter  (src/engine/instrumenter.ts)
   Acorn parses user code into an AST, then rewrites it to inject:
-    __pushFrame__ / __popFrame__  — track function call/return
-    __capture__                   — snapshot variables after each statement
-    __condition__                 — record if/else-if test results
+    __pushFrame__ / __popFrame__  — track function call/return + block scopes + closures + this
+    __capture__                   — snapshot variables after each statement (with optional column ranges)
+    __condition__                 — record if/else-if and loop condition results
     loop guards                   — abort runaway loops after 10,000 iterations
         │
         ▼
@@ -42,7 +45,7 @@ Web Worker  (disposable blob URL)
         │
         ▼
 Zustand store  (src/store/useStore.ts)
-  snapshots[], currentStep, code, isRunning, error
+  snapshots[], currentStep, code, isRunning, error, hideFunctions
         │
         ▼
 React UI  (src/components/)
@@ -84,10 +87,10 @@ src/
 ├── components/
 │   ├── AppNavbar.tsx     # Navbar (Sandbox / Examples / About)
 │   ├── ControlBar.tsx    # Visualize / step controls / share / embed
-│   ├── EditorPanel.tsx   # CodeMirror editor with line highlight + condition badges
+│   ├── EditorPanel.tsx   # CodeMirror editor with line/sub-line highlight + condition badges
 │   ├── VisualizationPanel.tsx
-│   ├── FramesView.tsx    # Recursive call stack + block scope cards
-│   ├── HeapView.tsx      # Heap object cards with ref-dot anchors
+│   ├── FramesView.tsx    # Recursive call stack + block scopes, closures, this context
+│   ├── HeapView.tsx      # Heap object cards with frame filter + hide functions toggle
 │   ├── PointerArrows.tsx # SVG overlay drawing reference arrows
 │   └── ConsolePanel.tsx  # Captured console output
 ├── pages/
@@ -97,15 +100,15 @@ src/
 │   ├── ShareWarningPage.tsx  # Security interstitial for shared-code links
 │   └── EmbedPage.tsx         # Iframe-friendly embed mode
 ├── store/
-│   └── useStore.ts       # Zustand store
+│   └── useStore.ts       # Zustand store (code, snapshots, step, view options)
 ├── types/
-│   └── snapshot.ts       # ExecutionSnapshot, StackFrame, HeapObject, etc.
+│   └── snapshot.ts       # ExecutionSnapshot, StackFrame, HeapObject, ColumnRange, etc.
 ├── utils/
-│   ├── examples.ts       # 12 built-in example snippets
+│   ├── examples.ts       # Built-in example snippets
 │   ├── share.ts          # LZ-string URL compression + static code analysis
 │   └── diffSnapshots.ts  # Detects changed values between steps (yellow flash)
 ├── main.tsx              # React entry point + HashRouter routes
-└── index.css             # Custom styles (layout, animations, condition badges)
+└── index.css             # Custom styles (layout, animations, condition badges, scope sections)
 ```
 
 ---
@@ -118,9 +121,13 @@ src/
 
 **TDZ-aware instrumentation** — `let`/`const` declarations are tracked incrementally so the visualizer never reads variables before they are initialized.
 
-**Block scopes rendered inline** — loop bodies and other block scopes appear as nested sections inside their parent frame card rather than as separate call-stack entries.
+**Block scopes rendered inline** — `for`, `while`, and `do...while` loop bodies with `let`/`const` appear as nested sections inside their parent frame card rather than as separate call-stack entries.
 
-**URL-based sharing** — the Share button LZ-string-compresses the code into the URL. Shared links open a security interstitial with a read-only code preview and a static analysis scan before execution.
+**Closure & `this` tracking** — when a nested function executes, variables closed over from enclosing scopes are displayed in a dedicated "Closure" section. Method calls show the `this` receiver object.
+
+**Sub-line for-loop highlighting** — for-loop init, condition, and update expressions carry column ranges through the snapshot pipeline, enabling precise sub-expression highlighting in the editor instead of whole-line highlighting.
+
+**URL-based sharing** — the Share button LZ-string-compresses the code into the URL. Shared links open a security interstitial with a read-only code preview and a static analysis scan before execution. View options (like "hide functions") are encoded as query parameters.
 
 ---
 

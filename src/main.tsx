@@ -10,6 +10,7 @@ import EmbedPage from './pages/EmbedPage';
 import AboutPage from './pages/AboutPage';
 import PrivacyPage from './pages/PrivacyPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ReportIssuePage from './pages/ReportIssuePage';
 import AppFooter from './components/AppFooter';
 
 createRoot(document.getElementById('root')!).render(
@@ -22,6 +23,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/share/:encoded" element={<ShareWarningPage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/privacy-policy" element={<PrivacyPage />} />
+        <Route path="/report-issue" element={<ReportIssuePage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
       <AppFooter />

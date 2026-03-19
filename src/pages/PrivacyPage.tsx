@@ -1,86 +1,133 @@
 import { Link } from 'react-router-dom';
 import AppNavbar from '../components/AppNavbar';
 
+const BRAND = '#DD030B';
+
 export default function PrivacyPage() {
   return (
     <>
       <AppNavbar />
       <div className="container py-5" style={{ maxWidth: '760px' }}>
         <h1 className="fw-bold mb-1">Privacy Policy</h1>
-        <p className="text-muted mb-5" style={{ fontSize: '0.875rem' }}>Last updated: March 19, 2026</p>
+        <p className="text-muted mb-4" style={{ fontSize: '0.875rem' }}>Last updated: March 19, 2026</p>
 
         <section className="mb-4">
-          <h2 className="h5">Overview</h2>
-          <p>
-            JSTutor is a free, educational tool. We are committed to being straightforward about how it works
-            and what, if anything, happens with your data.
-          </p>
+          <div
+            className="border rounded px-4 py-4 d-flex align-items-start gap-3"
+            style={{ background: '#f8f9fa' }}
+          >
+            <span style={{ fontSize: '1.4rem', lineHeight: 1, marginTop: 2 }}>🔒</span>
+            <div>
+              <div className="fw-semibold mb-1">The short version</div>
+              <div className="text-muted" style={{ fontSize: '0.92rem' }}>
+                <span style={{ color: BRAND, fontWeight: 600 }}>JS</span>Tutor runs entirely in your
+                browser. Your code never leaves your device, we don't require an account, and we
+                don't sell or share any data.
+              </div>
+            </div>
+          </div>
         </section>
 
         <section className="mb-4">
-          <h2 className="h5">Data Collection</h2>
-          <p>
-            JSTutor does not collect, store, or transmit any personal information. The tool runs entirely
-            in your browser. Code you write or paste into the editor is never sent to any server.
-          </p>
+          <h2 className="mb-3">What We Collect (and Don't)</h2>
+          <div className="d-flex flex-column gap-3">
+            {[
+              {
+                icon: '✦',
+                label: 'Personal information',
+                desc: 'None. JSTutor does not collect, store, or transmit any personal information.',
+              },
+              {
+                icon: '◆',
+                label: 'Your code',
+                desc: 'Never sent to a server. Code is executed locally inside a sandboxed Web Worker and stays on your device.',
+              },
+              {
+                icon: '↔',
+                label: 'Cookies & local storage',
+                desc: (
+                  <>
+                    Only <code>localStorage</code> for a small number of preferences (such as dismissing
+                    notices). No tracking cookies or third-party cookies are used.
+                  </>
+                ),
+              },
+              {
+                icon: '⬡',
+                label: 'Analytics',
+                desc: 'JSTutor may use a third-party analytics service to collect anonymous, aggregate usage data such as page views and general traffic patterns. No personally identifiable information is intentionally collected. You can opt out via your browser\'s privacy settings or an ad blocker.',
+              },
+            ].map(({ icon, label, desc }) => (
+              <div key={label} className="d-flex gap-3 align-items-start">
+                <span
+                  className="d-flex align-items-center justify-content-center flex-shrink-0 fw-bold rounded-circle"
+                  style={{ width: 32, height: 32, background: BRAND, color: '#fff', fontSize: '0.85rem', marginTop: 2 }}
+                >
+                  {icon}
+                </span>
+                <div>
+                  <div className="fw-semibold">{label}</div>
+                  <div className="text-muted" style={{ fontSize: '0.92rem' }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="mb-4">
-          <h2 className="h5">Code Execution</h2>
-          <p>
-            Code entered into JSTutor is executed locally in your browser inside a sandboxed Web Worker.
-            It does not leave your device.
-          </p>
+          <h2 className="mb-3">Sharing & Links</h2>
+          <div
+            className="border rounded px-4 py-3 d-flex align-items-start gap-3"
+            style={{ background: '#f8f9fa' }}
+          >
+            <span style={{ color: BRAND, fontSize: '1rem', lineHeight: 1.6, flexShrink: 0 }}>🔗</span>
+            <span className="text-muted" style={{ fontSize: '0.92rem' }}>
+              When you use the <strong>Share</strong> feature, your code is compressed and embedded
+              directly in the URL. No server stores this data. Anyone with the link can view and run
+              the encoded code, so only share links you are comfortable making accessible.
+            </span>
+          </div>
         </section>
 
         <section className="mb-4">
-          <h2 className="h5">Sharing &amp; Links</h2>
-          <p>
-            If you use the Share feature, your code is compressed and embedded directly in the URL.
-            No server stores this data. Anyone with the link can view and run the encoded code,
-            so only share links you are comfortable making accessible.
-          </p>
+          <h2 className="mb-3">Third-Party Services</h2>
+          <div className="d-flex flex-wrap gap-2">
+            {[
+              {
+                label: 'GitHub Pages',
+                desc: 'Hosts the site — your browser interacts with GitHub\'s infrastructure when loading the page.',
+                href: 'https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement',
+                linkText: 'GitHub Privacy Statement',
+              },
+              {
+                label: 'cdnjs / npm CDNs',
+                desc: 'May serve third-party libraries. These CDN providers may log standard request data (IP, user agent).',
+              },
+            ].map(({ label, desc, href, linkText }) => (
+              <div
+                key={label}
+                className="border rounded px-3 py-2 d-flex flex-column"
+                style={{ background: '#f8f9fa', fontSize: '0.9rem', flex: '1 1 280px' }}
+              >
+                <span className="fw-semibold" style={{ color: BRAND }}>{label}</span>
+                <span className="text-muted">
+                  {desc}
+                  {href && (
+                    <>
+                      {' '}See{' '}
+                      <a href={href} target="_blank" rel="noreferrer">{linkText}</a>.
+                    </>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="mb-4">
-          <h2 className="h5">Cookies &amp; Storage</h2>
-          <p>
-            JSTutor uses <code>localStorage</code> for a small number of user preferences (such as
-            dismissing notices). No tracking cookies or third-party cookies are used.
-          </p>
-        </section>
-
-        <section className="mb-4">
-          <h2 className="h5">Analytics</h2>
-          <p>
-            JSTutor may use a third-party analytics service to collect anonymous usage data, such as
-            page views and general traffic patterns. This helps improve the tool over time. Any such
-            service may set its own cookies and collect data such as your approximate location, browser
-            type, and pages visited. No personally identifiable information is intentionally collected
-            or shared.
-          </p>
-          <p>
-            You can opt out of analytics tracking through your browser's privacy settings or by using
-            an ad or tracker blocker.
-          </p>
-        </section>
-
-        <section className="mb-4">
-          <h2 className="h5">Third-Party Services</h2>
-          <p>
-            JSTutor is hosted on GitHub Pages. Your browser may interact with GitHub's infrastructure
-            when loading the page. Please refer to{' '}
-            <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" target="_blank" rel="noreferrer">
-              GitHub's Privacy Statement
-            </a>{' '}
-            for details on their data practices.
-          </p>
-        </section>
-
-        <section className="mb-4">
-          <h2 className="h5">Contact</h2>
-          <p>
-            If you have questions about this policy, you can reach the developer at{' '}
+          <h2 className="mb-3">Contact</h2>
+          <p className="text-muted" style={{ fontSize: '0.92rem' }}>
+            Questions about this policy? Reach the developer at{' '}
             <a href="https://coletnelson.us" target="_blank" rel="noreferrer">coletnelson.us</a>.
           </p>
         </section>

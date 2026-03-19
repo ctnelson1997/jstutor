@@ -189,6 +189,7 @@ function __collectHeap__(stackSnapshot) {
         visit(cvars[cv].value);
       }
     }
+    if (stackSnapshot[f].thisArg) visit(stackSnapshot[f].thisArg);
   }
   return result;
 }
@@ -197,6 +198,23 @@ function __collectHeap__(stackSnapshot) {
 
 function __condition__(value, line, expression) {
   if (__snapshots__.length >= __MAX_SNAPSHOTS) return value;
+
+  var columnRange = null;
+  if (Array.isArray(line)) {
+    columnRange = { startCol: line[1], endCol: line[2] };
+    line = line[0];
+  }
+
+  // Re-serialize this context from live references
+  var heapObjects = [];
+  var visited = new Set();
+  for (var ti = 0; ti < __callStack__.length; ti++) {
+    if (__callStack__[ti].__rawThis !== undefined) {
+      try {
+        __callStack__[ti].thisArg = __serializeValue__(__callStack__[ti].__rawThis, heapObjects, visited);
+      } catch(e) {}
+    }
+  }
 
   // Build a snapshot at the condition line using the current call stack state
   var stackSnapshot = [];
@@ -208,17 +226,20 @@ function __condition__(value, line, expression) {
     };
     if (fr.isBlockScope) ent.isBlockScope = true;
     if (fr.closureVars && fr.closureVars.length > 0) ent.closureVars = fr.closureVars;
+    if (fr.thisArg) ent.thisArg = fr.thisArg;
     stackSnapshot.push(ent);
   }
 
-  __snapshots__.push({
+  var snap = {
     step: __snapshots__.length,
     line: line,
     callStack: stackSnapshot,
     heap: __collectHeap__(stackSnapshot),
     stdout: __stdout__.slice(),
     condition: { expression: expression, result: !!value, line: line }
-  });
+  };
+  if (columnRange) snap.columnRange = columnRange;
+  __snapshots__.push(snap);
 
   return value;
 }
@@ -227,6 +248,12 @@ function __condition__(value, line, expression) {
 
 function __capture__(line, vars, parentVarNames, closureVars) {
   if (__snapshots__.length >= __MAX_SNAPSHOTS) return;
+
+  var columnRange = null;
+  if (Array.isArray(line)) {
+    columnRange = { startCol: line[1], endCol: line[2] };
+    line = line[0];
+  }
 
   var heapObjects = [];
   var visited = new Set();
@@ -313,6 +340,15 @@ function __capture__(line, vars, parentVarNames, closureVars) {
     }
   }
 
+  // Re-serialize this context from live references so mutations are visible
+  for (var ti = 0; ti < __callStack__.length; ti++) {
+    if (__callStack__[ti].__rawThis !== undefined) {
+      try {
+        __callStack__[ti].thisArg = __serializeValue__(__callStack__[ti].__rawThis, heapObjects, visited);
+      } catch(e) {}
+    }
+  }
+
   // Build snapshot of the full call stack
   var stackSnapshot = [];
   for (var j = 0; j < __callStack__.length; j++) {
@@ -323,21 +359,24 @@ function __capture__(line, vars, parentVarNames, closureVars) {
     };
     if (frame.isBlockScope) entry.isBlockScope = true;
     if (frame.closureVars && frame.closureVars.length > 0) entry.closureVars = frame.closureVars;
+    if (frame.thisArg) entry.thisArg = frame.thisArg;
     stackSnapshot.push(entry);
   }
 
-  __snapshots__.push({
+  var snap = {
     step: __snapshots__.length,
     line: line,
     callStack: stackSnapshot,
     heap: __collectHeap__(stackSnapshot),
     stdout: __stdout__.slice()
-  });
+  };
+  if (columnRange) snap.columnRange = columnRange;
+  __snapshots__.push(snap);
 }
 
 // ── Frame management ──
 
-function __pushFrame__(name, params, isBlockScope, closureVars) {
+function __pushFrame__(name, params, isBlockScope, closureVars, thisVal) {
   var frame = { name: name, variables: [], isBlockScope: !!isBlockScope };
   // Serialize params as initial frame variables
   var heapObjects = [];
@@ -375,6 +414,13 @@ function __pushFrame__(name, params, isBlockScope, closureVars) {
     }
     if (closureEntries.length > 0) frame.closureVars = closureEntries;
   }
+  // Store this context (skip global object and undefined)
+  if (thisVal !== undefined && thisVal !== self) {
+    frame.__rawThis = thisVal;
+    try {
+      frame.thisArg = __serializeValue__(thisVal, heapObjects, visited);
+    } catch(e) {}
+  }
   __callStack__.push(frame);
 }
 
@@ -393,6 +439,15 @@ function __popFrame__(retVal, line) {
         value: __serializeValue__(retVal, heapObjects, visited)
       });
 
+      // Re-serialize this context from live references
+      for (var ti = 0; ti < __callStack__.length; ti++) {
+        if (__callStack__[ti].__rawThis !== undefined) {
+          try {
+            __callStack__[ti].thisArg = __serializeValue__(__callStack__[ti].__rawThis, heapObjects, visited);
+          } catch(e) {}
+        }
+      }
+
       var stackSnapshot = [];
       for (var j = 0; j < __callStack__.length; j++) {
         var frame = __callStack__[j];
@@ -402,6 +457,7 @@ function __popFrame__(retVal, line) {
         };
         if (frame.isBlockScope) entry2.isBlockScope = true;
         if (frame.closureVars && frame.closureVars.length > 0) entry2.closureVars = frame.closureVars;
+        if (frame.thisArg) entry2.thisArg = frame.thisArg;
         stackSnapshot.push(entry2);
       }
       __snapshots__.push({

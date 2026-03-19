@@ -140,19 +140,61 @@ function HeapCard({ obj, changedKeys, step }: { obj: HeapObject; changedKeys: Se
 
 type HeapFilter = 'all' | 'current';
 
-/** Collect heap IDs directly referenced by a frame's variables. */
-function refsInFrame(frame: StackFrame): Set<string> {
-  const ids = new Set<string>();
-  for (const v of frame.variables) {
-    if (v.value.type === 'ref') ids.add(v.value.heapId);
+/**
+ * Collect all heap IDs reachable from the current execution context.
+ * Walks the top frame (plus parent if top is a block scope), including
+ * closure vars and thisArg, then transitively follows refs through
+ * heap object properties.
+ */
+function reachableHeapIds(callStack: StackFrame[], heap: HeapObject[]): Set<string> {
+  // Collect direct refs from the current execution context
+  const directRefs = new Set<string>();
+
+  function addVarRefs(frame: StackFrame) {
+    for (const v of frame.variables) {
+      if (v.value.type === 'ref') directRefs.add(v.value.heapId);
+    }
+    if (frame.closureVars) {
+      for (const v of frame.closureVars) {
+        if (v.value.type === 'ref') directRefs.add(v.value.heapId);
+      }
+    }
+    if (frame.thisArg && frame.thisArg.type === 'ref') {
+      directRefs.add(frame.thisArg.heapId);
+    }
   }
-  return ids;
+
+  // Walk from the top frame upward through any block scopes to the owning function frame
+  for (let i = callStack.length - 1; i >= 0; i--) {
+    addVarRefs(callStack[i]);
+    if (!callStack[i].isBlockScope) break;
+  }
+
+  // Transitively follow refs through heap object properties
+  const heapMap = new Map<string, HeapObject>();
+  for (const obj of heap) heapMap.set(obj.id, obj);
+
+  const reachable = new Set<string>();
+  function visit(id: string) {
+    if (reachable.has(id)) return;
+    reachable.add(id);
+    const obj = heapMap.get(id);
+    if (!obj) return;
+    for (const prop of obj.properties) {
+      if (prop.value.type === 'ref') visit(prop.value.heapId);
+    }
+  }
+  for (const id of directRefs) visit(id);
+
+  return reachable;
 }
 
 export default memo(function HeapView() {
   const snapshots = useStore((s) => s.snapshots);
   const currentStep = useStore((s) => s.currentStep);
   const [filter, setFilter] = useState<HeapFilter>('all');
+  const hideFunctions = useStore((s) => s.hideFunctions);
+  const setHideFunctions = useStore((s) => s.setHideFunctions);
 
   const snapshot = snapshots[currentStep];
 
@@ -163,14 +205,19 @@ export default memo(function HeapView() {
 
   const visibleObjects = useMemo(() => {
     if (!snapshot || snapshot.heap.length === 0) return [];
-    if (filter === 'all') return snapshot.heap;
+    let objects = snapshot.heap;
 
-    // "current" — only objects referenced by the top (most recent) frame
-    const topFrame = snapshot.callStack[snapshot.callStack.length - 1];
-    if (!topFrame) return snapshot.heap;
-    const topRefs = refsInFrame(topFrame);
-    return snapshot.heap.filter((obj) => topRefs.has(obj.id));
-  }, [snapshot, filter]);
+    if (filter === 'current') {
+      const reachable = reachableHeapIds(snapshot.callStack, snapshot.heap);
+      objects = objects.filter((obj) => reachable.has(obj.id));
+    }
+
+    if (hideFunctions) {
+      objects = objects.filter((obj) => obj.objectType !== 'function');
+    }
+
+    return objects;
+  }, [snapshot, filter, hideFunctions]);
 
   if (snapshots.length === 0) return null;
   if (!snapshot || snapshot.heap.length === 0) {
@@ -179,30 +226,41 @@ export default memo(function HeapView() {
 
   return (
     <div>
-      <ButtonGroup size="sm" className="mb-2">
+      <div className="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <ButtonGroup size="sm">
+          <Button
+            variant={filter === 'all' ? 'primary' : 'outline-primary'}
+            onClick={() => setFilter('all')}
+            style={{ fontSize: '0.7rem' }}
+            aria-pressed={filter === 'all'}
+          >
+            All frames
+          </Button>
+          <Button
+            variant={filter === 'current' ? 'primary' : 'outline-primary'}
+            onClick={() => setFilter('current')}
+            style={{ fontSize: '0.7rem' }}
+            aria-pressed={filter === 'current'}
+          >
+            Current frame
+          </Button>
+        </ButtonGroup>
         <Button
-          variant={filter === 'all' ? 'primary' : 'outline-primary'}
-          onClick={() => setFilter('all')}
+          variant={hideFunctions ? 'secondary' : 'outline-secondary'}
+          size="sm"
+          onClick={() => setHideFunctions(!hideFunctions)}
           style={{ fontSize: '0.7rem' }}
-          aria-pressed={filter === 'all'}
+          aria-pressed={hideFunctions}
         >
-          All frames
+          Hide functions
         </Button>
-        <Button
-          variant={filter === 'current' ? 'primary' : 'outline-primary'}
-          onClick={() => setFilter('current')}
-          style={{ fontSize: '0.7rem' }}
-          aria-pressed={filter === 'current'}
-        >
-          Current frame
-        </Button>
-      </ButtonGroup>
+      </div>
       {visibleObjects.length === 0 ? (
         <div className="text-muted" style={{ fontSize: '0.85rem', fontStyle: 'italic' }}>
           No objects in this frame
         </div>
       ) : (
-        <div className="d-flex flex-wrap gap-2">
+        <div className="d-flex flex-column gap-2">
           {visibleObjects.map((obj) => (
             <HeapCard key={obj.id} obj={obj} changedKeys={changedKeys} step={currentStep} />
           ))}

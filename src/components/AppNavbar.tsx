@@ -42,6 +42,7 @@ export default function AppNavbar() {
             ))}
           </NavDropdown>
           <Nav.Link as={Link} to="/about">About</Nav.Link>
+          <Nav.Link as={Link} to="/report-issue">Report an Issue</Nav.Link>
           <Nav.Link as={Link} to="/privacy-policy">Privacy Policy</Nav.Link>
         </Nav>
       </Navbar.Collapse>

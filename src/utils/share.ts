@@ -13,7 +13,7 @@ const VERSION_PREFIX_RE = /^v(\d+)~/;
  * Format: `v<N>~<lz-compressed-code>`
  */
 export function encodeShareCode(code: string): string {
-  return `v${SHARE_VERSION}~${compressToEncodedURIComponent(code)}`;
+  return `v${SHARE_VERSION}~${compressToEncodedURIComponent(code.trim())}`;
 }
 
 /**

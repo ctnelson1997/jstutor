@@ -21,21 +21,26 @@ export function getChangedKeys(
   if (!curr) return changed;
   if (!prev) return changed; // first step — nothing to compare
 
-  // --- Stack variables ---
+  // --- Stack variables (keyed by frame index to disambiguate recursion) ---
   const prevVarMap = new Map<string, string>();
-  for (const frame of prev.callStack) {
+  for (let i = 0; i < prev.callStack.length; i++) {
+    const frame = prev.callStack[i];
     for (const v of frame.variables) {
-      prevVarMap.set(`var:${frame.name}:${v.name}`, serializeValue(v.value));
+      prevVarMap.set(`var:${i}:${v.name}`, serializeValue(v.value));
     }
     if (frame.closureVars) {
       for (const v of frame.closureVars) {
-        prevVarMap.set(`closure:${frame.name}:${v.name}`, serializeValue(v.value));
+        prevVarMap.set(`closure:${i}:${v.name}`, serializeValue(v.value));
       }
     }
+    if (frame.thisArg) {
+      prevVarMap.set(`this:${i}`, serializeValue(frame.thisArg));
+    }
   }
-  for (const frame of curr.callStack) {
+  for (let i = 0; i < curr.callStack.length; i++) {
+    const frame = curr.callStack[i];
     for (const v of frame.variables) {
-      const key = `var:${frame.name}:${v.name}`;
+      const key = `var:${i}:${v.name}`;
       const prevVal = prevVarMap.get(key);
       if (prevVal === undefined || prevVal !== serializeValue(v.value)) {
         changed.add(key);
@@ -43,11 +48,18 @@ export function getChangedKeys(
     }
     if (frame.closureVars) {
       for (const v of frame.closureVars) {
-        const key = `closure:${frame.name}:${v.name}`;
+        const key = `closure:${i}:${v.name}`;
         const prevVal = prevVarMap.get(key);
         if (prevVal === undefined || prevVal !== serializeValue(v.value)) {
           changed.add(key);
         }
+      }
+    }
+    if (frame.thisArg) {
+      const key = `this:${i}`;
+      const prevVal = prevVarMap.get(key);
+      if (prevVal === undefined || prevVal !== serializeValue(frame.thisArg)) {
+        changed.add(key);
       }
     }
   }

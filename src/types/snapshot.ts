@@ -52,6 +52,7 @@ export interface StackFrame {
   variables: Variable[];
   isBlockScope?: boolean;
   closureVars?: Variable[];
+  thisArg?: RuntimeValue;
 }
 
 // ── Execution snapshot ──
@@ -62,9 +63,15 @@ export interface ConditionResult {
   line: number;
 }
 
+export interface ColumnRange {
+  startCol: number;  // 0-indexed
+  endCol: number;    // 0-indexed, exclusive
+}
+
 export interface ExecutionSnapshot {
   step: number;
   line: number;
+  columnRange?: ColumnRange;
   callStack: StackFrame[];
   heap: HeapObject[];
   stdout: string[];

@@ -44,7 +44,7 @@ function ValueDisplay({ value }: { value: RuntimeValue }) {
 }
 
 /** Render a variable table for a list of variables. */
-function VariableTable({ frame, changedKeys, step }: { frame: StackFrame; changedKeys: Set<string>; step: number }) {
+function VariableTable({ frame, frameIndex, changedKeys, step }: { frame: StackFrame; frameIndex: number; changedKeys: Set<string>; step: number }) {
   if (frame.variables.length === 0) return null;
 
   return (
@@ -52,7 +52,7 @@ function VariableTable({ frame, changedKeys, step }: { frame: StackFrame; change
       <tbody>
         {frame.variables.map((v) => {
           const isReturn = v.name === 'return \u21b5';
-          const isChanged = changedKeys.has(`var:${frame.name}:${v.name}`);
+          const isChanged = changedKeys.has(`var:${frameIndex}:${v.name}`);
           return (
             <tr key={v.name} style={isReturn ? { borderTop: '1px dashed #0d6efd' } : undefined}>
               <td
@@ -80,6 +80,7 @@ function VariableTable({ frame, changedKeys, step }: { frame: StackFrame; change
 /** Recursive block-scope node (handles nested loops). */
 interface BlockScopeNode {
   frame: StackFrame;
+  index: number;
   children: BlockScopeNode[];
 }
 
@@ -99,7 +100,7 @@ function groupFrames(callStack: StackFrame[]): FrameGroup[] {
   for (let i = 0; i < callStack.length; i++) {
     const frame = callStack[i];
     if (frame.isBlockScope && groups.length > 0) {
-      const node: BlockScopeNode = { frame, children: [] };
+      const node: BlockScopeNode = { frame, index: i, children: [] };
       if (blockStack.length > 0) {
         // Nest inside the deepest current block scope
         blockStack[blockStack.length - 1].children.push(node);
@@ -121,7 +122,7 @@ function BlockScopeSection({ node, changedKeys, step }: { node: BlockScopeNode; 
   return (
     <div className="block-scope-section">
       <div className="block-scope-label">{node.frame.name} block</div>
-      <VariableTable frame={node.frame} changedKeys={changedKeys} step={step} />
+      <VariableTable frame={node.frame} frameIndex={node.index} changedKeys={changedKeys} step={step} />
       {node.children.map((child, i) => (
         <BlockScopeSection key={`${child.frame.name}-${i}`} node={child} changedKeys={changedKeys} step={step} />
       ))}
@@ -130,14 +131,14 @@ function BlockScopeSection({ node, changedKeys, step }: { node: BlockScopeNode; 
 }
 
 /** Render a closure variable table (uses "closure:" key prefix for change detection). */
-function ClosureVariableTable({ frame, changedKeys, step }: { frame: StackFrame; changedKeys: Set<string>; step: number }) {
+function ClosureVariableTable({ frameIndex, frame, changedKeys, step }: { frameIndex: number; frame: StackFrame; changedKeys: Set<string>; step: number }) {
   if (!frame.closureVars || frame.closureVars.length === 0) return null;
 
   return (
     <table className="w-100">
       <tbody>
         {frame.closureVars.map((v) => {
-          const isChanged = changedKeys.has(`closure:${frame.name}:${v.name}`);
+          const isChanged = changedKeys.has(`closure:${frameIndex}:${v.name}`);
           return (
             <tr key={v.name}>
               <td
@@ -159,13 +160,39 @@ function ClosureVariableTable({ frame, changedKeys, step }: { frame: StackFrame;
   );
 }
 
+/** Render a this-context section showing the ref-dot to the receiver object. */
+function ThisContextSection({ frameIndex, frame, changedKeys, step }: { frameIndex: number; frame: StackFrame; changedKeys: Set<string>; step: number }) {
+  if (!frame.thisArg) return null;
+
+  const isChanged = changedKeys.has(`this:${frameIndex}`);
+
+  return (
+    <div className="this-scope-section">
+      <div className="this-scope-label">this</div>
+      <table className="w-100">
+        <tbody>
+          <tr>
+            <td className="fw-semibold" style={{ fontFamily: 'monospace' }}>this</td>
+            <td className="text-end">
+              <span key={isChanged ? step : undefined} className={isChanged ? 'value-changed' : undefined}>
+                <ValueDisplay value={frame.thisArg} />
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function FrameCard({ group, changedKeys, step }: { group: FrameGroup; changedKeys: Set<string>; step: number }) {
   const isGlobal = group.index === 0;
   const variant = isGlobal ? 'secondary' : 'primary';
   const hasParentVars = group.frame.variables.length > 0;
   const hasBlockScopes = group.blockScopes.length > 0;
   const hasClosure = !!(group.frame.closureVars && group.frame.closureVars.length > 0);
-  const isEmpty = !hasParentVars && !hasBlockScopes && !hasClosure;
+  const hasThis = !!group.frame.thisArg;
+  const isEmpty = !hasParentVars && !hasBlockScopes && !hasClosure && !hasThis;
 
   return (
     <Card className="frame-card mb-2" border={variant}>
@@ -180,10 +207,13 @@ function FrameCard({ group, changedKeys, step }: { group: FrameGroup; changedKey
             {hasClosure && (
               <div className="closure-scope-section">
                 <div className="closure-scope-label">Closure</div>
-                <ClosureVariableTable frame={group.frame} changedKeys={changedKeys} step={step} />
+                <ClosureVariableTable frameIndex={group.index} frame={group.frame} changedKeys={changedKeys} step={step} />
               </div>
             )}
-            <VariableTable frame={group.frame} changedKeys={changedKeys} step={step} />
+            {hasThis && (
+              <ThisContextSection frameIndex={group.index} frame={group.frame} changedKeys={changedKeys} step={step} />
+            )}
+            <VariableTable frame={group.frame} frameIndex={group.index} changedKeys={changedKeys} step={step} />
             {group.blockScopes.map((node, i) => (
               <BlockScopeSection key={`${node.frame.name}-${i}`} node={node} changedKeys={changedKeys} step={step} />
             ))}

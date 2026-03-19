@@ -138,6 +138,12 @@ html, body, #root {
   background-color: rgba(255, 255, 100, 0.25) !important;
 }
 
+/* Sub-line highlight for specific expressions (e.g. for-loop parts) */
+.cm-current-step-highlight {
+  background-color: rgba(255, 220, 50, 0.4);
+  border-radius: 2px;
+}
+
 /* Condition badge (true/false pill in editor) */
 .condition-badge {
   display: inline-block;
@@ -243,10 +249,30 @@ html, body, #root {
   margin-bottom: 0.1rem;
 }
 
+/* This context section */
+.this-scope-section {
+  margin-bottom: 0.3rem;
+  padding: 0.25rem 0.4rem;
+  border-left: 2px solid #0dcaf0;
+  margin-left: 0.15rem;
+  background: rgba(13, 202, 240, 0.04);
+  border-radius: 0 3px 3px 0;
+}
+
+.this-scope-label {
+  font-size: 0.65rem;
+  color: #0dcaf0;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.1rem;
+}
+
 /* Heap object cards */
 .heap-card {
   font-size: 0.8rem;
   min-width: 110px;
+  align-self: start;
   animation: heapFadeIn 0.25s ease-out;
 }
 

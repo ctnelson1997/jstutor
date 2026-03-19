@@ -4,11 +4,16 @@ import { javascript } from '@codemirror/lang-javascript';
 import { EditorView, Decoration, WidgetType, type DecorationSet } from '@codemirror/view';
 import { StateField, StateEffect } from '@codemirror/state';
 import { useStore } from '../store/useStore';
-import type { ConditionResult } from '../types/snapshot';
+import type { ColumnRange, ConditionResult } from '../types/snapshot';
 
 // ── Line highlight via CodeMirror state effect ──
 
-const setHighlightLine = StateEffect.define<number | null>();
+interface HighlightInfo {
+  line: number;
+  columnRange?: ColumnRange;
+}
+
+const setHighlightLine = StateEffect.define<HighlightInfo | null>();
 
 const highlightField = StateField.define<DecorationSet>({
   create() {
@@ -18,9 +23,16 @@ const highlightField = StateField.define<DecorationSet>({
     for (const effect of tr.effects) {
       if (effect.is(setHighlightLine)) {
         if (effect.value === null) return Decoration.none;
-        const line = effect.value;
+        const { line, columnRange } = effect.value;
         if (line < 1 || line > tr.state.doc.lines) return Decoration.none;
         const lineObj = tr.state.doc.line(line);
+        if (columnRange) {
+          // Sub-line highlight for specific expression (e.g. for-loop parts)
+          const from = lineObj.from + columnRange.startCol;
+          const to = lineObj.from + columnRange.endCol;
+          const mark = Decoration.mark({ class: 'cm-current-step-highlight' });
+          return Decoration.set([mark.range(from, to)]);
+        }
         const deco = Decoration.line({ class: 'cm-current-step-line' });
         return Decoration.set([deco.range(lineObj.from)]);
       }
@@ -141,7 +153,9 @@ export default function EditorPanel() {
 
   // Determine which line to highlight
   const snapshot = snapshots.length > 0 ? snapshots[currentStep] : null;
-  const highlightLine = snapshot?.line ?? null;
+  const highlightInfo: HighlightInfo | null = snapshot
+    ? { line: snapshot.line, columnRange: snapshot.columnRange }
+    : null;
   const condition = snapshot?.condition ?? null;
 
   // Update the highlight decoration when step changes
@@ -165,15 +179,15 @@ export default function EditorPanel() {
       const view = viewUpdate.view;
       const effects: StateEffect<unknown>[] = [];
 
-      // Check if highlight line needs updating
+      // Check if highlight needs updating
       const decoSet = view.state.field(highlightField);
       let currentlyHighlighted: number | null = null;
       const iter = decoSet.iter();
       if (iter.value) {
         currentlyHighlighted = view.state.doc.lineAt(iter.from).number;
       }
-      if (currentlyHighlighted !== highlightLine) {
-        effects.push(setHighlightLine.of(highlightLine));
+      if (currentlyHighlighted !== (highlightInfo?.line ?? null) || highlightInfo?.columnRange) {
+        effects.push(setHighlightLine.of(highlightInfo));
       }
 
       // Always sync condition badge (covers same-line result changes)
@@ -184,7 +198,7 @@ export default function EditorPanel() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [highlightLine, conditionKey],
+    [highlightInfo, conditionKey],
   );
 
   return (

@@ -75,9 +75,12 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
     }
   };
 
+  const hideFunctions = useStore((s) => s.hideFunctions);
+
   const handleShare = () => {
     const encoded = encodeShareCode(code);
-    const url = `${window.location.origin}${window.location.pathname}#/share/${encoded}`;
+    const opts = hideFunctions ? '?hf=1' : '';
+    const url = `${window.location.origin}${window.location.pathname}#/share/${encoded}${opts}`;
     setShareUrl(url);
     setCopied(false);
     setShowShareModal(true);
@@ -108,7 +111,8 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
 
   const handleEmbed = () => {
     const encoded = encodeShareCode(code);
-    const embedUrl = `${window.location.origin}${window.location.pathname}#/embed/${encoded}`;
+    const opts = hideFunctions ? '?hf=1' : '';
+    const embedUrl = `${window.location.origin}${window.location.pathname}#/embed/${encoded}${opts}`;
     const lines = code.split('\n').length;
     const height = Math.min(900, Math.max(400, lines * 22 + 280));
     const maxWidth = Math.min(1200, height * 2);

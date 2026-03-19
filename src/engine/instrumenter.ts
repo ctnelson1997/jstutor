@@ -125,7 +125,7 @@ function extractPatternNames(pattern: AnyNode, names: string[]): void {
  * Get all variable names that are in scope at a given block level.
  * `scopeChain` is an array of scope-name strings we track for naming.
  */
-function buildCaptureExpression(varNames: string[], line: number): AnyNode {
+function buildCaptureExpression(varNames: string[], line: number, columnRange?: { start: { column: number }; end: { column: number } }): AnyNode {
   // __capture__(line, { var1: var1, var2: var2, ... })
   const properties = varNames.map((name) => ({
     type: 'Property',
@@ -138,7 +138,7 @@ function buildCaptureExpression(varNames: string[], line: number): AnyNode {
   }));
 
   const args: AnyNode[] = [
-    { type: 'Literal', value: line },
+    buildLineArg(line, columnRange),
     { type: 'ObjectExpression', properties },
   ];
 
@@ -184,7 +184,7 @@ function buildCaptureExpression(varNames: string[], line: number): AnyNode {
   };
 }
 
-function buildPushFrame(name: string, paramNames: string[], isBlockScope = false, closureVarNames?: string[] | null): AnyNode {
+function buildPushFrame(name: string, paramNames: string[], isBlockScope = false, closureVarNames?: string[] | null, captureThis = false): AnyNode {
   const properties = paramNames.map((n) => ({
     type: 'Property',
     key: { type: 'Identifier', name: n },
@@ -221,6 +221,17 @@ function buildPushFrame(name: string, paramNames: string[], isBlockScope = false
     args.push({ type: 'ObjectExpression', properties: closureProps });
   }
 
+  // Pass `this` as fifth argument for non-arrow functions
+  if (captureThis) {
+    // Ensure args 2-4 exist as placeholders
+    while (args.length < 4) {
+      args.push(args.length === 2
+        ? { type: 'Literal', value: false }
+        : { type: 'Literal', value: null, raw: 'null' });
+    }
+    args.push({ type: 'ThisExpression' });
+  }
+
   return {
     type: 'ExpressionStatement',
     expression: {
@@ -244,7 +255,21 @@ function buildPopFrame(): AnyNode {
   };
 }
 
-function buildConditionWrapper(testExpr: AnyNode): AnyNode {
+function buildLineArg(line: number, loc?: { start: { column: number }; end: { column: number } }): AnyNode {
+  if (loc) {
+    return {
+      type: 'ArrayExpression',
+      elements: [
+        { type: 'Literal', value: line },
+        { type: 'Literal', value: loc.start.column },
+        { type: 'Literal', value: loc.end.column },
+      ],
+    };
+  }
+  return { type: 'Literal', value: line };
+}
+
+function buildConditionWrapper(testExpr: AnyNode, columnRange?: { start: { column: number }; end: { column: number } }): AnyNode {
   const line = testExpr.loc?.start?.line ?? 0;
   const exprText = generate(testExpr);
   return {
@@ -252,7 +277,7 @@ function buildConditionWrapper(testExpr: AnyNode): AnyNode {
     callee: { type: 'Identifier', name: '__condition__' },
     arguments: [
       testExpr,
-      { type: 'Literal', value: line },
+      buildLineArg(line, columnRange),
       { type: 'Literal', value: exprText },
     ],
     optional: false,
@@ -339,8 +364,13 @@ function instrumentBlock(
     // them before the for statement is safe. let/const inits are also extracted
     // so that the block-scope frame can be pushed before the condition check.
     if (stmt.type === 'ForStatement' && stmt.init) {
+      // Stash test/update column ranges on the for-statement for instrumentLoop
+      if (stmt.test?.loc) stmt._testColRange = stmt.test.loc;
+      if (stmt.update?.loc) stmt._updateColRange = stmt.update.loc;
+
       if (stmt.init.type === 'VariableDeclaration' && stmt.init.kind === 'var') {
         const initDecl = stmt.init;
+        initDecl._forColumnRange = initDecl.loc;
         stmt.init = null;
         body.splice(i, 0, initDecl);
         continue; // re-process at index i, which now points to initDecl
@@ -358,6 +388,7 @@ function instrumentBlock(
         stmt._blockScopeVars = bsvNames;
         const initDecl = stmt.init;
         initDecl._isBlockScopeInit = true; // marks this decl as loop-local; skip parent captures
+        initDecl._forColumnRange = initDecl.loc;
         stmt.init = null;
         body.splice(i, 0, initDecl);
         continue; // re-process at index i (initDecl), then the for-stmt
@@ -367,6 +398,7 @@ function instrumentBlock(
           type: 'ExpressionStatement',
           expression: stmt.init,
           loc: stmt.init.loc,
+          _forColumnRange: stmt.init.loc,
         };
         stmt.init = null;
         body.splice(i, 0, exprStmt);
@@ -421,8 +453,9 @@ function instrumentBlock(
       const capture = buildCaptureExpression(declaredSoFar, line);
       body.splice(i, 0, capture);
       i += 2; // skip past inserted capture + the statement
-    } else if (shouldCaptureAfter(stmt) && !stmt._isBlockScopeInit) {
-      const capture = buildCaptureExpression(declaredSoFar, line);
+    } else if (shouldCaptureAfter(stmt) && (!stmt._isBlockScopeInit || stmt._forColumnRange)) {
+      const colRange = stmt._forColumnRange ?? undefined;
+      const capture = buildCaptureExpression(declaredSoFar, line, colRange);
       body.splice(i + 1, 0, capture);
       i += 2; // skip past the original statement + inserted capture
     } else {
@@ -681,7 +714,9 @@ function instrumentFunction(fn: AnyNode, _parentVars: string[]): void {
   instrumentBlock(body, fnScopeVars, true);
 
   // Insert __pushFrame__ at the beginning of the function body
-  body.unshift(buildPushFrame(name, paramNames, false, _closureVarNames));
+  // Arrow functions don't have their own `this`, so only capture it for regular functions
+  const captureThis = fn.type !== 'ArrowFunctionExpression';
+  body.unshift(buildPushFrame(name, paramNames, false, _closureVarNames, captureThis));
 
   // Wrap return values so the frame pops AFTER the expression evaluates
   wrapReturnsWithPopFrame(body);
@@ -747,7 +782,10 @@ function wrapReturnsInBranches(stmt: AnyNode): void {
 function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
   // Wrap loop test expressions with __condition__ (like if statements)
   if (stmt.test && (stmt.type === 'WhileStatement' || stmt.type === 'DoWhileStatement' || stmt.type === 'ForStatement')) {
-    stmt.test = buildConditionWrapper(stmt.test);
+    // For for-loops, pass the test's column range (stashed by instrumentBlock)
+    const testColRange = stmt._testColRange ?? undefined;
+    delete stmt._testColRange;
+    stmt.test = buildConditionWrapper(stmt.test, testColRange);
   }
 
   // Collect loop-specific variable declarations
@@ -786,6 +824,24 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
     delete stmt._blockScopeVars;
   }
 
+  // For while/do-while loops, scan the body for let/const declarations.
+  // These are block-scoped to the loop body, just like for-loop init vars.
+  if (stmt.type === 'WhileStatement' || stmt.type === 'DoWhileStatement') {
+    const bodyStmts = stmt.body.type === 'BlockStatement' ? stmt.body.body : [stmt.body];
+    for (const s of bodyStmts) {
+      if (s.type === 'VariableDeclaration' && (s.kind === 'let' || s.kind === 'const')) {
+        for (const decl of s.declarations) {
+          const names: string[] = [];
+          extractPatternNames(decl.id, names);
+          for (const name of names) {
+            if (!blockScopedVars.includes(name)) blockScopedVars.push(name);
+            if (!loopVars.includes(name)) loopVars.push(name);
+          }
+        }
+      }
+    }
+  }
+
   // Ensure the body is a block statement
   if (stmt.body.type !== 'BlockStatement') {
     stmt.body = {
@@ -799,10 +855,13 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
 
   // Move for-loop update into body so it gets its own capture step
   if (stmt.type === 'ForStatement' && stmt.update) {
+    const updateColRange = stmt._updateColRange ?? undefined;
+    delete stmt._updateColRange;
     const updateStmt: AnyNode = {
       type: 'ExpressionStatement',
       expression: stmt.update,
       loc: stmt.update.loc,
+      _forColumnRange: updateColRange,
     };
     stmt.update = null;
     stmt.body.body.push(updateStmt);
@@ -811,15 +870,24 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
   if (blockScopedVars.length > 0) {
     // Determine descriptive frame name
     const loopName = stmt.type === 'ForInStatement' ? 'for...in'
-      : stmt.type === 'ForOfStatement' ? 'for...of' : 'for';
+      : stmt.type === 'ForOfStatement' ? 'for...of'
+        : stmt.type === 'WhileStatement' ? 'while'
+          : stmt.type === 'DoWhileStatement' ? 'do...while' : 'for';
 
-    const pushNode = buildPushFrame(loopName, blockScopedVars, true);
+    // For while/do-while, body-declared vars aren't available yet at push time
+    // (TDZ), so push with empty params — they'll appear in subsequent captures.
+    const isWhileStyle = stmt.type === 'WhileStatement' || stmt.type === 'DoWhileStatement';
+    const pushNode = buildPushFrame(loopName, isWhileStyle ? [] : blockScopedVars, true);
     const popNode = buildPopFrame();
 
     if (stmt.type === 'ForStatement' && stmt.init === null) {
       // let/const init was pre-extracted into the parent block: push/pop go in a
       // wrapper block around the for statement so the frame is alive during every
       // condition check. instrumentBlock will apply the wrapper after this returns.
+      stmt._blockWrap = { push: pushNode, pop: popNode };
+    } else if (isWhileStyle) {
+      // while/do-while: wrap the loop so the block frame is alive during condition
+      // checks (same approach as for-loops with extracted init).
       stmt._blockWrap = { push: pushNode, pop: popNode };
     } else {
       // for...in / for...of: no separate condition step, so push/pop inside body is fine
@@ -839,8 +907,11 @@ function instrumentLoop(stmt: AnyNode, scopeVars: string[]): void {
     _parentVarNames = scopeVars.filter(
       (n: string) => !blockScopedVars.includes(n) && !ancestorVars.includes(n),
     );
+    // For while/do-while, block-scoped vars are declared inside the body
+    // and must NOT be pre-included — let instrumentBlock discover them
+    // incrementally to respect TDZ (temporal dead zone).
     const effectiveLoopVars = loopVars.filter(
-      (n: string) => !ancestorVars.includes(n),
+      (n: string) => !ancestorVars.includes(n) && !(isWhileStyle && blockScopedVars.includes(n)),
     );
 
     instrumentBlock(stmt.body.body, effectiveLoopVars, false);

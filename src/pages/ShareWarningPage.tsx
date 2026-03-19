@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card, Button, Alert } from 'react-bootstrap';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
@@ -10,7 +10,9 @@ import { useStore } from '../store/useStore';
 export default function ShareWarningPage() {
   const { encoded } = useParams<{ encoded: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const setCode = useStore((s) => s.setCode);
+  const setHideFunctions = useStore((s) => s.setHideFunctions);
   const reset = useStore((s) => s.reset);
 
   const code = useMemo(() => {
@@ -32,9 +34,11 @@ export default function ShareWarningPage() {
     if (code) {
       reset();
       setCode(code);
+      const params = new URLSearchParams(location.search);
+      if (params.get('hf') === '1') setHideFunctions(true);
       navigate('/');
     }
-  }, [code, reset, setCode, navigate]);
+  }, [code, reset, setCode, setHideFunctions, location.search, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate('/');
