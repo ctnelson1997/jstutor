@@ -7,6 +7,7 @@ import App from './App';
 import ShareWarningPage from './pages/ShareWarningPage';
 import ExamplePage from './pages/ExamplePage';
 import EmbedPage from './pages/EmbedPage';
+import AboutPage from './pages/AboutPage';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/examples/:slug" element={<ExamplePage />} />
         <Route path="/embed/:encoded" element={<EmbedPage />} />
         <Route path="/share/:encoded" element={<ShareWarningPage />} />
+        <Route path="/about" element={<AboutPage />} />
       </Routes>
     </HashRouter>
   </StrictMode>,

@@ -8,7 +8,6 @@ export default function AppNavbar() {
   const setCode = useStore((s) => s.setCode);
   const reset = useStore((s) => s.reset);
 
-  // Group examples by category
   const categories = [...new Set(EXAMPLES.map((e) => e.category))];
 
   const handleSandbox = () => {
@@ -26,18 +25,23 @@ export default function AppNavbar() {
       <Navbar.Collapse id="navbar-nav">
         <Nav className="me-auto">
           <Nav.Link onClick={handleSandbox} style={{ cursor: 'pointer' }}>Sandbox</Nav.Link>
-          {categories.map((cat) => (
-            <NavDropdown key={cat} title={cat} id={`nav-${cat}`}>
-              {EXAMPLES.filter((e) => e.category === cat).map((ex) => (
-                <NavDropdown.Item
-                  key={ex.slug}
-                  onClick={() => navigate(`/examples/${ex.slug}`)}
-                >
-                  {ex.title}
-                </NavDropdown.Item>
-              ))}
-            </NavDropdown>
-          ))}
+          <NavDropdown title="Examples" id="nav-examples">
+            {categories.map((cat, i) => (
+              <>
+                {i > 0 && <NavDropdown.Divider key={`divider-${cat}`} />}
+                <NavDropdown.Header key={`header-${cat}`}>{cat}</NavDropdown.Header>
+                {EXAMPLES.filter((e) => e.category === cat).map((ex) => (
+                  <NavDropdown.Item
+                    key={ex.slug}
+                    onClick={() => navigate(`/examples/${ex.slug}`)}
+                  >
+                    {ex.title}
+                  </NavDropdown.Item>
+                ))}
+              </>
+            ))}
+          </NavDropdown>
+          <Nav.Link as={Link} to="/about">About</Nav.Link>
         </Nav>
       </Navbar.Collapse>
     </Navbar>
