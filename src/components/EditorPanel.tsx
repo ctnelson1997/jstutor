@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { javascript } from '@codemirror/lang-javascript';
 import { EditorView, Decoration, WidgetType, type DecorationSet } from '@codemirror/view';
@@ -100,48 +100,7 @@ export default function EditorPanel() {
   const error = useStore((s) => s.error);
   const reset = useStore((s) => s.reset);
 
-  // Make the editor fill its flex container and scroll when content exceeds it.
-  const fillHeight = useMemo(
-    () =>
-      EditorView.theme({
-        '&': { height: '100%' },
-        '.cm-scroller': { overflow: 'auto' },
-      }),
-    [],
-  );
-
-  const extensions = useMemo(() => [javascript(), highlightField, conditionField, fillHeight], [fillHeight]);
-
-  // Pad the document with trailing newlines so line numbers fill the
-  // visible editor area. A ResizeObserver keeps the count in sync with
-  // the actual container height. We use a ref (not state) for minLines
-  // so resize events don't trigger re-renders that disrupt typing/scroll.
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const minLinesRef = useRef(25);
-  const prevPaddedRef = useRef('');
-
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      minLinesRef.current = Math.ceil(el.clientHeight / 20) + 1;
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  const paddedCode = useMemo(() => {
-    const lineCount = code.split('\n').length;
-    const minLines = minLinesRef.current;
-    if (lineCount >= minLines) return code;
-    return code + '\n'.repeat(minLines - lineCount);
-  }, [code]);
-
-  // Cache so CodeMirror only sees a new value when the visible content
-  // actually changes, not on every render.
-  if (paddedCode !== prevPaddedRef.current) {
-    prevPaddedRef.current = paddedCode;
-  }
+  const extensions = useMemo(() => [javascript(), highlightField, conditionField], []);
 
   const onChange = useCallback(
     (value: string) => {
@@ -210,22 +169,26 @@ export default function EditorPanel() {
         </div>
       )}
 
-      {/* CodeMirror editor */}
-      <div ref={wrapperRef} className="flex-grow-1" style={{ minHeight: 0, overflow: 'hidden' }}>
-        <CodeMirror
-          value={paddedCode}
-          extensions={extensions}
-          onChange={onChange}
-          onCreateEditor={onCreateEditor}
-          onUpdate={onUpdate}
-          theme="light"
-          basicSetup={{
-            lineNumbers: true,
-            foldGutter: true,
-            highlightActiveLine: false,
-          }}
-        />
-      </div>
+      {/* CodeMirror editor — height="100%" sets .cm-editor + .cm-scroller
+           via a theme extension; className="flex-grow-1" sets height on the
+           wrapper div that @uiw/react-codemirror renders, completing the chain
+           so the scroller actually constrains and scrolls. */}
+      <CodeMirror
+        className="flex-grow-1"
+        style={{ minHeight: 0 }}
+        height="100%"
+        value={code}
+        extensions={extensions}
+        onChange={onChange}
+        onCreateEditor={onCreateEditor}
+        onUpdate={onUpdate}
+        theme="light"
+        basicSetup={{
+          lineNumbers: true,
+          foldGutter: true,
+          highlightActiveLine: false,
+        }}
+      />
     </div>
   );
 }

@@ -126,10 +126,18 @@ export default memo(function PointerArrows({ containerRef }: { containerRef: Rea
       observer.observe(container, { childList: true, subtree: true });
     }
 
+    // Redraw when the container is resized (e.g. pane divider drag)
+    let resizeObs: ResizeObserver | undefined;
+    if (container) {
+      resizeObs = new ResizeObserver(scheduleRedraw);
+      resizeObs.observe(container);
+    }
+
     return () => {
       window.removeEventListener('resize', scheduleRedraw);
       container?.removeEventListener('scroll', scheduleRedraw);
       observer?.disconnect();
+      resizeObs?.disconnect();
       if (rafId.current) {
         cancelAnimationFrame(rafId.current);
         rafId.current = 0;

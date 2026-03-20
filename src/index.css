@@ -119,16 +119,7 @@ html, body, #root {
   transition: opacity 0.5s ease !important;
 }
 
-/* CodeMirror fill parent */
-.cm-editor {
-  height: 100% !important;
-}
-
-.cm-scroller {
-  overflow: auto !important;
-}
-
-/* Make the gutter background extend to fill the full editor height */
+/* Gutter background fills the visible editor area even when code is short */
 .cm-editor .cm-gutters {
   min-height: 100% !important;
 }
