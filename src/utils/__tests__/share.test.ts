@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { encodeShareCode, decodeShareCode, analyzeCode } from '../share';
+import { encodeShareCode, decodeShareCode } from '../share';
+import { analyzeCode } from '../../engines/js/security';
 
 describe('encodeShareCode / decodeShareCode', () => {
   it('round-trips code correctly', () => {

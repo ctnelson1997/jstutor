@@ -26,31 +26,30 @@ Everything runs in your browser. No server, no account, no data collection.
 
 ## Architecture
 
+The app is built around a **pluggable engine system** designed for multi-language support. Each language implements a `LanguageEngine` interface; the UI is language-agnostic.
+
 ```
 User Code (CodeMirror editor)
         │
         ▼
-Instrumenter  (src/engine/instrumenter.ts)
-  Acorn parses user code into an AST, then rewrites it to inject:
-    __pushFrame__ / __popFrame__  — track function call/return + block scopes + closures + this
-    __capture__                   — snapshot variables after each statement (with optional column ranges)
-    __condition__                 — record if/else-if and loop condition results
-    loop guards                   — abort runaway loops after 10,000 iterations
+LanguageEngine.execute(source)   (src/engines/js/)
+  Instrumenter  — Acorn AST transform injecting runtime hooks
+  Runtime       — JS preamble for state capture & serialization
+  Web Worker    — disposable blob URL, killed after 10s / 5,000 snapshots
         │
         ▼
-Web Worker  (disposable blob URL)
-  runtime preamble (src/engine/runtime.ts) + instrumented code
-  collects __snapshots__[] as code runs
-  killed after 10 s or 5,000 snapshots
+ExecutionSnapshot[]
         │
         ▼
 Zustand store  (src/store/useStore.ts)
-  snapshots[], currentStep, code, isRunning, error, hideFunctions
+  language, snapshots[], currentStep, code, isRunning, error
         │
         ▼
 React UI  (src/components/)
-  EditorPanel  ·  VisualizationPanel  ·  FramesView  ·  HeapView  ·  PointerArrows  ·  ConsolePanel
+  EditorPanel  ·  FramesView  ·  HeapView  ·  PointerArrows  ·  ConsolePanel
 ```
+
+Currently JavaScript is the only engine. Adding a new language requires implementing a `LanguageEngine` under `src/engines/<lang>/` and registering it in `src/engines/registry.ts`.
 
 ---
 
@@ -71,6 +70,7 @@ npm run dev          # dev server at http://localhost:3000
 |---------|-------------|
 | `npm run dev` | Start Vite dev server with HMR |
 | `npm run build` | Type-check + build to `docs/` |
+| `npm run test` | Run tests (Vitest, 125 tests) |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build locally |
 
@@ -80,35 +80,42 @@ npm run dev          # dev server at http://localhost:3000
 
 ```
 src/
+├── engines/                    # Pluggable language engine system
+│   ├── registry.ts             # getEngine(), getEngineSync(), SUPPORTED_LANGUAGES
+│   └── js/                     # JavaScript engine
+│       ├── index.ts            # LanguageEngine implementation
+│       ├── instrumenter.ts     # Acorn AST transform — injects runtime hooks
+│       ├── runtime.ts          # Worker preamble: __capture__, serialization, heap registry
+│       ├── executor.ts         # instrument → worker → snapshots (no store coupling)
+│       ├── examples.ts         # Built-in JS example snippets
+│       └── security.ts         # Suspicious code pattern detection
 ├── engine/
-│   ├── instrumenter.ts   # Acorn AST transform — injects runtime hooks
-│   ├── executor.ts       # Orchestrator: instrument → worker → store
-│   └── runtime.ts        # Worker preamble: __capture__, serialization, heap registry
+│   └── executor.ts             # Thin dispatcher: store → engine → store
 ├── components/
-│   ├── AppNavbar.tsx     # Navbar (Sandbox / Examples / About)
-│   ├── ControlBar.tsx    # Visualize / step controls / share / embed
-│   ├── EditorPanel.tsx   # CodeMirror editor with line/sub-line highlight + condition badges
+│   ├── AppNavbar.tsx           # Navbar (Sandbox / Examples / Language selector / About)
+│   ├── ControlBar.tsx          # Visualize / step controls / share / embed
+│   ├── EditorPanel.tsx         # CodeMirror editor with line/sub-line highlight + condition badges
 │   ├── VisualizationPanel.tsx
-│   ├── FramesView.tsx    # Recursive call stack + block scopes, closures, this context
-│   ├── HeapView.tsx      # Heap object cards with frame filter + hide functions toggle
-│   ├── PointerArrows.tsx # SVG overlay drawing reference arrows
-│   └── ConsolePanel.tsx  # Captured console output
+│   ├── FramesView.tsx          # Recursive call stack + block scopes, closures, this context
+│   ├── HeapView.tsx            # Heap object cards with frame filter + hide functions toggle
+│   ├── PointerArrows.tsx       # SVG overlay drawing reference arrows
+│   └── ConsolePanel.tsx        # Captured console output
 ├── pages/
-│   ├── App.tsx               # Main layout (resizable split, keyboard shortcuts)
-│   ├── AboutPage.tsx         # About / usage guide
-│   ├── ExamplePage.tsx       # Loads a built-in example by slug
-│   ├── ShareWarningPage.tsx  # Security interstitial for shared-code links
-│   └── EmbedPage.tsx         # Iframe-friendly embed mode
+│   ├── AboutPage.tsx           # About / usage guide
+│   ├── ExamplePage.tsx         # Loads a built-in example by slug
+│   ├── ShareWarningPage.tsx    # Security interstitial for shared-code links
+│   └── EmbedPage.tsx           # Iframe-friendly embed mode
 ├── store/
-│   └── useStore.ts       # Zustand store (code, snapshots, step, view options)
+│   └── useStore.ts             # Zustand store (language, code, snapshots, step, view options)
 ├── types/
-│   └── snapshot.ts       # ExecutionSnapshot, StackFrame, HeapObject, ColumnRange, etc.
+│   ├── snapshot.ts             # ExecutionSnapshot, StackFrame, HeapObject, etc.
+│   └── engine.ts               # LanguageEngine interface, LanguageId, CodeExample
 ├── utils/
-│   ├── examples.ts       # Built-in example snippets
-│   ├── share.ts          # LZ-string URL compression + static code analysis
-│   └── diffSnapshots.ts  # Detects changed values between steps (yellow flash)
-├── main.tsx              # React entry point + HashRouter routes
-└── index.css             # Custom styles (layout, animations, condition badges, scope sections)
+│   ├── share.ts                # LZ-string URL compression
+│   └── diffSnapshots.ts        # Detects changed values between steps (yellow flash)
+├── App.tsx                     # Main layout (resizable split, keyboard shortcuts)
+├── main.tsx                    # React entry point + HashRouter routes
+└── index.css                   # Custom styles (layout, animations, condition badges, scope sections)
 ```
 
 ---

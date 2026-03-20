@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { instrument } from '../instrumenter';
+import { instrument } from '../../engines/js/instrumenter';
 
 describe('instrument', () => {
   // ── Parse errors ──

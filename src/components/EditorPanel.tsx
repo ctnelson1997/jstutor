@@ -1,9 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
 import { EditorView, Decoration, WidgetType, type DecorationSet } from '@codemirror/view';
 import { StateField, StateEffect } from '@codemirror/state';
 import { useStore } from '../store/useStore';
+import { useEngine } from '../engines/useEngine';
 import type { ColumnRange, ConditionResult } from '../types/snapshot';
 
 // ── Line highlight via CodeMirror state effect ──
@@ -100,7 +100,12 @@ export default function EditorPanel() {
   const error = useStore((s) => s.error);
   const reset = useStore((s) => s.reset);
 
-  const extensions = useMemo(() => [javascript(), highlightField, conditionField], []);
+  const language = useStore((s) => s.language);
+  const engine = useEngine(language);
+  const extensions = useMemo(
+    () => [engine?.editorExtension() ?? [], highlightField, conditionField],
+    [engine],
+  );
 
   const onChange = useCallback(
     (value: string) => {

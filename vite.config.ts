@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -7,5 +8,11 @@ export default defineConfig({
   base: '/',
   build: {
     outDir: 'docs',
+  },
+  test: {
+    // @vitejs/plugin-react (Babel) initialization races across parallel
+    // worker threads on Windows, causing intermittent "Cannot read
+    // properties of undefined (reading 'config')" failures.
+    fileParallelism: false,
   },
 })

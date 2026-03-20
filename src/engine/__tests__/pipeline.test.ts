@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createContext, runInContext } from 'node:vm';
-import { instrument } from '../instrumenter';
-import { getRuntimeCode } from '../runtime';
+import { instrument } from '../../engines/js/instrumenter';
+import { getRuntimeCode } from '../../engines/js/runtime';
 import type { ExecutionSnapshot } from '../../types/snapshot';
 
 /**
@@ -22,9 +22,9 @@ function runPipeline(source: string): ExecutionSnapshot[] {
     self: {},
     // Builtins used by the runtime preamble
     console: {
-      log: (..._args: unknown[]) => {},
-      warn: (..._args: unknown[]) => {},
-      error: (..._args: unknown[]) => {},
+      log: () => {},
+      warn: () => {},
+      error: () => {},
     },
     Map,
     Set,

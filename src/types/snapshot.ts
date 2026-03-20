@@ -21,7 +21,7 @@ export interface Property {
   value: RuntimeValue;
 }
 
-export type HeapObjectType =
+export type CommonHeapObjectType =
   | 'object'
   | 'array'
   | 'function'
@@ -31,6 +31,9 @@ export type HeapObjectType =
   | 'map'
   | 'set'
   | 'error';
+
+// Open union: engines can emit any string type (e.g. Python's 'dict', 'tuple')
+export type HeapObjectType = CommonHeapObjectType | (string & {});
 
 export interface HeapObject {
   id: string;

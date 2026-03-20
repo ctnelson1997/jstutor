@@ -1,7 +1,12 @@
 import { create } from 'zustand';
 import type { ExecutionSnapshot } from '../types/snapshot';
+import type { LanguageId } from '../types/engine';
 
 export interface JSTutorState {
+  // ── Language ──
+  language: LanguageId;
+  setLanguage: (language: LanguageId) => void;
+
   // ── Editor ──
   code: string;
   setCode: (code: string) => void;
@@ -34,6 +39,10 @@ let x = 1;`;
 const DEFAULT_CODE = SANDBOX_CODE;
 
 export const useStore = create<JSTutorState>((set, get) => ({
+  // ── Language ──
+  language: 'js' as LanguageId,
+  setLanguage: (language) => set({ language }),
+
   // ── Editor ──
   code: DEFAULT_CODE,
   setCode: (code) => set({ code }),

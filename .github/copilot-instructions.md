@@ -35,35 +35,47 @@ Web Worker (Blob URL, disposable)  →  __snapshots__[]
 Zustand store  →  React UI (editor + visualization)
 ```
 
-### Execution Engine (src/engine/)
+### Multi-Language Engine System (src/engines/)
 
-The engine uses **native JavaScript execution inside a disposable Web Worker** (not QuickJS/WASM). A fresh worker is created for each run via `URL.createObjectURL(new Blob([...]))` to guarantee a clean global scope. Workers are terminated after 10 seconds as a safety net.
+The app uses a **pluggable engine architecture** designed for multi-language support. Each language implements the `LanguageEngine` interface (defined in `src/types/engine.ts`) and is registered in `src/engines/registry.ts`.
 
-#### instrumenter.ts
-- Parses user code with **Acorn** (`ecmaVersion: 'latest'`, `sourceType: 'script'`, `locations: true`).
-- Walks the AST and injects capture/frame calls:
-  - `__capture__(line, { ...vars })` after each statement to snapshot variable state.
-  - `__pushFrame__(name, { ...params })` at function entry.
-  - `__popFrame__()` at function exit (and before every `return`).
-  - Loop guards: `if (++__loopCount > __MAX_LOOPS) throw ...` at the top of every loop body.
-  - `eval` is blocked by reassigning it to `undefined`.
-- **TDZ-aware**: Tracks `declaredSoFar` incrementally. Only `var`/`function` (hoisted) names are captured from the start of a block; `let`/`const` names are added *after* their declaration statement is processed. This prevents "Cannot access before initialization" errors.
-- Key functions: `instrument()` (entry point), `instrumentBlock()`, `instrumentFunction()`, `instrumentStatement()`, `instrumentExpression()`, `instrumentLoop()`, `instrumentClass()`, `collectHoistedNames()`, `collectDeclaredNamesFromStmt()`.
+#### Engine Interface (`src/types/engine.ts`)
+Each engine provides: `id`, `displayName`, `editorExtension()` (CodeMirror language), `execute(source)` (returns `Promise<WorkerMessage>`), `examples`, `sandboxCode`, optional `analyzeCode()`, and optional `heapTypeConfig` for custom heap type display.
 
-#### runtime.ts
-- `getRuntimeCode()` returns a self-contained JS string (no imports) that is **prepended** to the instrumented code inside the worker.
-- Implements `__capture__()`, `__pushFrame__()`, `__popFrame__()`, `__logOutput__()`.
-- Deep serialization via `__serializeValue__()` and `__serializeHeapObject__()` with a `Map`-based identity tracker (`__heapMap__`) to assign stable heap IDs.
-- Console overrides: `console.log/warn/error/info` are patched to call `__logOutput__()`.
-- Exposes `self.__snapshots__` for the worker host to read after execution.
+#### Engine Registry (`src/engines/registry.ts`)
+- `getEngine(id)` — async, lazy-loads engine on first call
+- `getEngineSync(id)` — returns cached engine or undefined
+- `SUPPORTED_LANGUAGES` — array of registered language IDs
+- `isLanguageId(value)` — type guard for URL param validation
 
-#### executor.ts
-- `runCode(source)` orchestrates the full pipeline: instrument → prepend runtime → execute in worker → update store.
-- `createWorker()` creates a blob-URL worker that does an indirect `eval` on received code.
-- `executeInWorker(code)` wraps execution in a `Promise` with a 10-second timeout and `worker.terminate()` fallback.
+#### Dispatcher (`src/engine/executor.ts`)
+- `runCode(source)` reads `language` from the Zustand store, gets the engine via the registry, calls `engine.execute()`, and updates the store. All UI components import `runCode` from here.
 
-#### worker.ts
-- Static worker template file (currently unused — `executor.ts` generates workers dynamically via blob URLs).
+#### JavaScript Engine (`src/engines/js/`)
+
+Uses **native JavaScript execution inside a disposable Web Worker** (not QuickJS/WASM). A fresh worker is created for each run via `URL.createObjectURL(new Blob([...]))`.
+
+**instrumenter.ts** — Parses user code with **Acorn** and injects:
+  - `__capture__(line, { ...vars })` after each statement
+  - `__pushFrame__(name, { ...params })` / `__popFrame__()` at function entry/exit
+  - `__condition__()` around if/else-if/loop test expressions
+  - Loop guards: `if (++__loopCount > __MAX_LOOPS) throw ...`
+  - Blocks `eval` by reassigning it to `undefined`
+- **TDZ-aware**: Tracks `declaredSoFar` incrementally.
+
+**runtime.ts** — `getRuntimeCode()` returns a self-contained JS string prepended to instrumented code. Implements serialization, heap tracking, call stack management, and console capture.
+
+**executor.ts** — Pure `execute(source): Promise<WorkerMessage>` with no store coupling. Handles instrumentation, worker creation, and 10-second timeout.
+
+**examples.ts** — 11 built-in JS examples with `language: 'js'` field.
+
+**security.ts** — `analyzeCode()` regex-based suspicious API detection.
+
+#### Adding a New Language
+1. Create `src/engines/<lang>/` implementing `LanguageEngine`
+2. Add one line to `src/engines/registry.ts`
+3. Expand `LanguageId` in `src/types/engine.ts`
+4. The language selector in AppNavbar appears automatically when 2+ engines exist
 
 ---
 
@@ -94,13 +106,14 @@ Zustand store with flat structure:
 
 | Field | Type | Purpose |
 |---|---|---|
+| `language` | `LanguageId` | Active language engine ('js') |
 | `code` | `string` | Current editor content |
 | `snapshots` | `ExecutionSnapshot[]` | All captured steps |
 | `currentStep` | `number` | Active step index |
 | `isRunning` | `boolean` | Execution in progress |
 | `error` | `{ message, line? } \| null` | Last error |
 
-Actions: `setCode`, `setSnapshots`, `setCurrentStep`, `stepForward`, `stepBackward`, `stepFirst`, `stepLast`, `setIsRunning`, `setError`, `reset`.
+Actions: `setLanguage`, `setCode`, `setSnapshots`, `setCurrentStep`, `stepForward`, `stepBackward`, `stepFirst`, `stepLast`, `setIsRunning`, `setError`, `reset`.
 
 ---
 
@@ -156,16 +169,12 @@ Actions: `setCode`, `setSnapshots`, `setCurrentStep`, `stepForward`, `stepBackwa
 ## Utilities (src/utils/)
 
 ### share.ts
-- `encodeShareCode(code)` / `decodeShareCode(encoded)` — lz-string URL compression.
-- `analyzeCode(code)` — regex-based static analysis that flags suspicious API usage (fetch, WebSocket, eval, localStorage, location, etc.).
+- `encodeShareCode(code)` / `decodeShareCode(encoded)` — lz-string URL compression with versioned format (`v1~<compressed>`).
 
-### examples.ts
-- 12 pre-built example snippets across 5 categories:
-  - **Basics**: Variables & Types, Loops, Conditionals
-  - **Functions**: Recursion (Fibonacci), Closures, Higher-Order Functions
-  - **Data Structures**: Arrays, Linked List
-  - **Objects & Classes**: Object Literals, Classes & Inheritance
-  - **Async**: Promises, Async/Await
+### diffSnapshots.ts
+- `getChangedKeys(prev, curr)` — compares consecutive snapshots, returns `Set<string>` of changed value keys (used for yellow flash animation).
+
+Note: `analyzeCode()` and examples have moved to `src/engines/js/security.ts` and `src/engines/js/examples.ts` respectively.
 
 ---
 
@@ -176,7 +185,12 @@ Uses `HashRouter` (client-side only, no server config needed):
 | Route | Component | Purpose |
 |---|---|---|
 | `/` | `App` | Main editor + visualization |
-| `/share/:encoded` | `ShareWarningPage` | Warning interstitial for shared code |
+| `/examples/:slug` | `ExamplePage` | Load example (defaults to JS) |
+| `/examples/:lang/:slug` | `ExamplePage` | Language-specific example |
+| `/share/:encoded` | `ShareWarningPage` | Shared code (defaults to JS) |
+| `/share/:lang/:encoded` | `ShareWarningPage` | Language-specific shared code |
+| `/embed/:encoded` | `EmbedPage` | Embed mode (defaults to JS) |
+| `/embed/:lang/:encoded` | `EmbedPage` | Language-specific embed |
 
 ---
 
@@ -196,36 +210,47 @@ Uses `HashRouter` (client-side only, no server config needed):
 jstutor/
 ├── index.html
 ├── package.json
-├── vite.config.ts
+├── vite.config.ts                   # Vite + Vitest config (fileParallelism: false)
+├── CLAUDE.md                        # Claude Code project instructions
 ├── tsconfig.json / tsconfig.app.json / tsconfig.node.json
 ├── eslint.config.js
 ├── public/
 ├── src/
-│   ├── main.tsx                    # Entry: HashRouter + routes
-│   ├── App.tsx                     # Main layout + keyboard shortcuts
-│   ├── index.css                   # All custom styles
+│   ├── main.tsx                     # Entry: HashRouter + routes + eager engine load
+│   ├── App.tsx                      # Main layout + keyboard shortcuts
+│   ├── index.css                    # All custom styles
+│   ├── engines/                     # Pluggable language engine system
+│   │   ├── registry.ts             # Engine registry (lazy loading)
+│   │   └── js/                     # JavaScript engine
+│   │       ├── index.ts            # LanguageEngine implementation
+│   │       ├── instrumenter.ts     # Acorn AST transform (core engine)
+│   │       ├── runtime.ts          # Worker runtime preamble (JS string)
+│   │       ├── executor.ts         # instrument → worker → snapshots
+│   │       ├── examples.ts         # 11 JS example snippets
+│   │       └── security.ts         # Suspicious code pattern detection
+│   ├── engine/
+│   │   └── executor.ts             # Thin dispatcher: store → engine → store
 │   ├── components/
-│   │   ├── AppNavbar.tsx           # Navbar + examples + share
+│   │   ├── AppNavbar.tsx           # Navbar + examples + language selector
 │   │   ├── EditorPanel.tsx         # CodeMirror editor + line highlight
-│   │   ├── ControlBar.tsx          # Step controls + slider
+│   │   ├── ControlBar.tsx          # Step controls + share/embed
 │   │   ├── VisualizationPanel.tsx  # Frames + heap + console composition
 │   │   ├── FramesView.tsx          # Call stack variable cards
 │   │   ├── HeapView.tsx            # Heap object visualization
+│   │   ├── PointerArrows.tsx       # SVG reference arrows
 │   │   └── ConsolePanel.tsx        # Terminal-style output
-│   ├── engine/
-│   │   ├── instrumenter.ts         # Acorn AST transform (core engine)
-│   │   ├── runtime.ts              # Worker runtime preamble (JS string)
-│   │   ├── executor.ts             # Orchestrator: instrument → worker → store
-│   │   └── worker.ts               # Static worker template (unused)
 │   ├── pages/
-│   │   └── ShareWarningPage.tsx    # Shared-link warning interstitial
+│   │   ├── ShareWarningPage.tsx    # Shared-link warning interstitial
+│   │   ├── EmbedPage.tsx           # Iframe embed mode
+│   │   └── ExamplePage.tsx         # Load example by slug
 │   ├── store/
 │   │   └── useStore.ts             # Zustand store
 │   ├── types/
-│   │   └── snapshot.ts             # TypeScript data model
+│   │   ├── snapshot.ts             # ExecutionSnapshot, StackFrame, HeapObject, etc.
+│   │   └── engine.ts               # LanguageEngine interface, LanguageId
 │   └── utils/
-│       ├── examples.ts             # 12 example snippets
-│       └── share.ts                # lz-string encoding + code analysis
+│       ├── share.ts                # lz-string URL encoding
+│       └── diffSnapshots.ts        # Snapshot change detection
 └── .github/
     └── copilot-instructions.md     # This file
 ```
@@ -237,17 +262,21 @@ jstutor/
 ```bash
 npm install          # Install dependencies
 npm run dev          # Start dev server (localhost:3000)
-npm run build        # Type-check + production build
-npm run preview      # Preview production build
+npm run build        # Type-check + production build (outputs to docs/)
+npm run test         # Run Vitest (125 tests)
 npm run lint         # ESLint
+npm run preview      # Preview production build
 ```
 
 ---
 
 ## Known Considerations
 
-- **worker.ts is unused**: The executor creates workers dynamically via blob URLs. The static `worker.ts` file was part of an earlier design and can be removed.
-- **acorn-walk is installed but unused**: Was installed during development but the instrumenter uses manual AST traversal instead. Can be removed from dependencies.
-- **Infinite loop protection**: Loops are guarded with a counter that throws after 10,000 iterations. The worker itself is killed after 10 seconds.
-- **Snapshot limit**: The runtime caps at 5,000 snapshots per execution to prevent memory issues.
-- **Async code**: The examples include Promise/async-await snippets, but the step-by-step visualization is synchronous capture-based. Async code will execute but microtask boundaries won't produce intermediate captures.
+- **acorn-walk is installed but unused**: The instrumenter uses manual AST traversal. Can be removed.
+- **Infinite loop protection**: Loops are guarded with a counter that throws after 10,000 iterations. Workers killed after 10 seconds.
+- **Snapshot limit**: The runtime caps at 5,000 snapshots per execution.
+- **Async code**: Visualization is synchronous capture-based. Async code executes but microtask boundaries don't produce intermediate captures.
+- **TypeScript constraints**: `erasableSyntaxOnly: true` (no enums, no parameter properties), `verbatimModuleSyntax: true`.
+- **Testing**: `fileParallelism: false` is required in `vite.config.ts` — the `@vitejs/plugin-react` Babel initialization races across parallel worker threads on Windows. Do not remove this setting.
+- **HeapObjectType**: Open string union — language engines can emit custom types beyond the JS built-ins.
+- **Multi-language ready**: The `LanguageEngine` interface, engine registry, language-aware routing, and language selector UI are all in place. Adding a second language requires only engine implementation + one registry line.

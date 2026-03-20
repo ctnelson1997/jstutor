@@ -1,7 +1,9 @@
 import { memo, useState, useMemo } from 'react';
 import { Card, ButtonGroup, Button } from 'react-bootstrap';
 import { useStore } from '../store/useStore';
+import { useEngine } from '../engines/useEngine';
 import type { HeapObject, RuntimeValue, StackFrame } from '../types/snapshot';
+import type { HeapTypeDisplay } from '../types/engine';
 import { getChangedKeys } from '../utils/diffSnapshots';
 
 function ValueDisplay({ value }: { value: RuntimeValue }) {
@@ -92,30 +94,26 @@ function FunctionDisplay({ obj }: { obj: HeapObject }) {
   );
 }
 
-const typeLabels: Record<string, string> = {
-  array: 'Array',
-  object: 'Object',
-  function: 'Function',
-  class: 'Class',
-  date: 'Date',
-  regexp: 'RegExp',
-  map: 'Map',
-  set: 'Set',
-  error: 'Error',
+const defaultTypeConfig: Record<string, HeapTypeDisplay> = {
+  array: { label: 'Array', variant: 'info' },
+  object: { label: 'Object', variant: 'warning' },
+  function: { label: 'Function', variant: 'dark' },
+  class: { label: 'Class', variant: 'warning' },
+  date: { label: 'Date', variant: 'warning' },
+  regexp: { label: 'RegExp', variant: 'warning' },
+  map: { label: 'Map', variant: 'warning' },
+  set: { label: 'Set', variant: 'warning' },
+  error: { label: 'Error', variant: 'warning' },
 };
 
-function HeapCard({ obj, changedKeys, step }: { obj: HeapObject; changedKeys: Set<string>; step: number }) {
+function HeapCard({ obj, changedKeys, step, typeConfig }: { obj: HeapObject; changedKeys: Set<string>; step: number; typeConfig: Record<string, HeapTypeDisplay> }) {
+  const config = typeConfig[obj.objectType] ?? { label: obj.objectType, variant: 'warning' };
 
   const label = obj.label
-    ? `${typeLabels[obj.objectType] || obj.objectType}: ${obj.label}`
-    : typeLabels[obj.objectType] || obj.objectType;
+    ? `${config.label}: ${obj.label}`
+    : config.label;
 
-  const variant =
-    obj.objectType === 'array'
-      ? 'info'
-      : obj.objectType === 'function'
-        ? 'dark'
-        : 'warning';
+  const variant = config.variant;
 
   return (
     <Card className="heap-card mb-2" border={variant} id={`heap-${obj.id}`}>
@@ -195,6 +193,13 @@ export default memo(function HeapView() {
   const [filter, setFilter] = useState<HeapFilter>('all');
   const hideFunctions = useStore((s) => s.hideFunctions);
   const setHideFunctions = useStore((s) => s.setHideFunctions);
+  const language = useStore((s) => s.language);
+
+  const engine = useEngine(language);
+  const typeConfig = useMemo(
+    () => ({ ...defaultTypeConfig, ...engine?.heapTypeConfig }),
+    [engine],
+  );
 
   const snapshot = snapshots[currentStep];
 
@@ -262,7 +267,7 @@ export default memo(function HeapView() {
       ) : (
         <div className="d-flex flex-column gap-2">
           {visibleObjects.map((obj) => (
-            <HeapCard key={obj.id} obj={obj} changedKeys={changedKeys} step={currentStep} />
+            <HeapCard key={obj.id} obj={obj} changedKeys={changedKeys} step={currentStep} typeConfig={typeConfig} />
           ))}
         </div>
       )}

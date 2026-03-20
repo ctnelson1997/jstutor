@@ -1,18 +1,33 @@
 import { Navbar, Nav, NavDropdown } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
-import { EXAMPLES } from '../utils/examples';
-import { useStore, SANDBOX_CODE } from '../store/useStore';
+import { useStore } from '../store/useStore';
+import { getEngine, getEngineSync, SUPPORTED_LANGUAGES } from '../engines/registry';
+import { useEngine } from '../engines/useEngine';
+import type { LanguageId } from '../types/engine';
 
 export default function AppNavbar() {
   const navigate = useNavigate();
   const setCode = useStore((s) => s.setCode);
+  const setLanguage = useStore((s) => s.setLanguage);
   const reset = useStore((s) => s.reset);
+  const language = useStore((s) => s.language);
+  const engine = useEngine(language);
 
-  const categories = [...new Set(EXAMPLES.map((e) => e.category))];
+  const examples = engine?.examples ?? [];
+  const categories = [...new Set(examples.map((e) => e.category))];
 
   const handleSandbox = () => {
     reset();
-    setCode(SANDBOX_CODE);
+    setCode(engine?.sandboxCode ?? '');
+    navigate('/');
+  };
+
+  const handleLanguageSwitch = async (id: LanguageId) => {
+    if (id === language) return;
+    const newEngine = await getEngine(id);
+    reset();
+    setLanguage(id);
+    setCode(newEngine.sandboxCode);
     navigate('/');
   };
 
@@ -30,10 +45,10 @@ export default function AppNavbar() {
               <>
                 {i > 0 && <NavDropdown.Divider key={`divider-${cat}`} />}
                 <NavDropdown.Header key={`header-${cat}`}>{cat}</NavDropdown.Header>
-                {EXAMPLES.filter((e) => e.category === cat).map((ex) => (
+                {examples.filter((e) => e.category === cat).map((ex) => (
                   <NavDropdown.Item
                     key={ex.slug}
-                    onClick={() => navigate(`/examples/${ex.slug}`)}
+                    onClick={() => navigate(`/examples/${language}/${ex.slug}`)}
                   >
                     {ex.title}
                   </NavDropdown.Item>
@@ -41,6 +56,22 @@ export default function AppNavbar() {
               </>
             ))}
           </NavDropdown>
+          {SUPPORTED_LANGUAGES.length > 1 && (
+            <NavDropdown title={engine?.displayName ?? language} id="nav-language">
+              {SUPPORTED_LANGUAGES.map((id) => {
+                const eng = getEngineSync(id);
+                return (
+                  <NavDropdown.Item
+                    key={id}
+                    active={id === language}
+                    onClick={() => handleLanguageSwitch(id)}
+                  >
+                    {eng?.displayName ?? id}
+                  </NavDropdown.Item>
+                );
+              })}
+            </NavDropdown>
+          )}
         </Nav>
         <Nav>
           <Nav.Link as={Link} to="/about">About</Nav.Link>

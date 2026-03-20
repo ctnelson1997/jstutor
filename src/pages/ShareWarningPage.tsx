@@ -2,43 +2,52 @@ import { useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Card, Button, Alert } from 'react-bootstrap';
 import CodeMirror from '@uiw/react-codemirror';
-import { javascript } from '@codemirror/lang-javascript';
 import { EditorView } from '@codemirror/view';
-import { decodeShareCode, analyzeCode, type CodeFlag } from '../utils/share';
+import { decodeShareCode } from '../utils/share';
 import { useStore } from '../store/useStore';
+import { isLanguageId } from '../engines/registry';
+import { useEngine } from '../engines/useEngine';
+import type { CodeFlag } from '../types/engine';
 
 export default function ShareWarningPage() {
-  const { encoded } = useParams<{ encoded: string }>();
+  const { encoded, lang } = useParams<{ encoded: string; lang?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const setCode = useStore((s) => s.setCode);
   const setHideFunctions = useStore((s) => s.setHideFunctions);
+  const setLanguage = useStore((s) => s.setLanguage);
   const reset = useStore((s) => s.reset);
+
+  // Apply language from URL param (default to 'js' for legacy links)
+  const language = lang && isLanguageId(lang) ? lang : 'js';
 
   const code = useMemo(() => {
     if (!encoded) return null;
     return decodeShareCode(encoded);
   }, [encoded]);
 
+  const engine = useEngine(language);
+
   const flags: CodeFlag[] = useMemo(() => {
     if (!code) return [];
-    return analyzeCode(code);
-  }, [code]);
+    return engine?.analyzeCode?.(code) ?? [];
+  }, [code, engine]);
 
   const extensions = useMemo(
-    () => [javascript(), EditorView.editable.of(false)],
-    [],
+    () => [engine?.editorExtension() ?? [], EditorView.editable.of(false)],
+    [engine],
   );
 
   const handleRunCode = useCallback(() => {
     if (code) {
       reset();
+      setLanguage(language);
       setCode(code);
       const params = new URLSearchParams(location.search);
       if (params.get('hf') === '1') setHideFunctions(true);
       navigate('/');
     }
-  }, [code, reset, setCode, setHideFunctions, location.search, navigate]);
+  }, [code, reset, setLanguage, language, setCode, setHideFunctions, location.search, navigate]);
 
   const handleCancel = useCallback(() => {
     navigate('/');
