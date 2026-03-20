@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import AppNavbar from '../components/AppNavbar';
+import { branding } from '../config/branding';
 
-const BRAND = '#DD030B';
+const BRAND = branding.brandColor;
 
 export default function PrivacyPage() {
   return (
@@ -20,7 +21,7 @@ export default function PrivacyPage() {
             <div>
               <div className="fw-semibold mb-1">The short version</div>
               <div className="text-muted" style={{ fontSize: '0.92rem' }}>
-                <span style={{ color: BRAND, fontWeight: 600 }}>JS</span>Tutor runs entirely in your
+                <span style={{ color: BRAND, fontWeight: 600 }}>{branding.brandPrefix}</span>{branding.brandSuffix} runs entirely in your
                 browser. Your code never leaves your device, we don't require an account, and we
                 don't sell or share any data.
               </div>
@@ -35,7 +36,7 @@ export default function PrivacyPage() {
               {
                 icon: '✦',
                 label: 'Personal information',
-                desc: 'None. JSTutor does not collect, store, or transmit any personal information.',
+                desc: `None. ${branding.appName} does not collect, store, or transmit any personal information.`,
               },
               {
                 icon: '◆',
@@ -55,7 +56,7 @@ export default function PrivacyPage() {
               {
                 icon: '⬡',
                 label: 'Analytics',
-                desc: 'JSTutor may use a third-party analytics service to collect anonymous, aggregate usage data such as page views and general traffic patterns. No personally identifiable information is intentionally collected. You can opt out via your browser\'s privacy settings or an ad blocker.',
+                desc: `${branding.appName} may use a third-party analytics service to collect anonymous, aggregate usage data such as page views and general traffic patterns. No personally identifiable information is intentionally collected. You can opt out via your browser's privacy settings or an ad blocker.`,
               },
             ].map(({ icon, label, desc }) => (
               <div key={label} className="d-flex gap-3 align-items-start">

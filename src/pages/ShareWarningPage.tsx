@@ -7,6 +7,7 @@ import { decodeShareCode } from '../utils/share';
 import { useStore } from '../store/useStore';
 import { isLanguageId } from '../engines/registry';
 import { useEngine } from '../engines/useEngine';
+import { branding } from '../config/branding';
 import type { CodeFlag } from '../types/engine';
 
 export default function ShareWarningPage() {
@@ -18,8 +19,8 @@ export default function ShareWarningPage() {
   const setLanguage = useStore((s) => s.setLanguage);
   const reset = useStore((s) => s.reset);
 
-  // Apply language from URL param (default to 'js' for legacy links)
-  const language = lang && isLanguageId(lang) ? lang : 'js';
+  // Apply language from URL param (default to build target for legacy links)
+  const language = lang && isLanguageId(lang) ? lang : branding.languageId;
 
   const code = useMemo(() => {
     if (!encoded) return null;
@@ -60,7 +61,7 @@ export default function ShareWarningPage() {
           <Alert.Heading>Invalid Share Link</Alert.Heading>
           <p>The shared code could not be decoded. The link may be corrupted.</p>
           <Button variant="primary" onClick={handleCancel}>
-            Go to JSTutor
+            Go to {branding.appName}
           </Button>
         </Alert>
       </div>

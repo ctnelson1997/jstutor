@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import AppNavbar from '../components/AppNavbar';
+import { branding } from '../config/branding';
 
 export default function NotFoundPage() {
   return (
@@ -11,7 +12,7 @@ export default function NotFoundPage() {
         <p className="text-muted mb-4">
           The page you're looking for doesn't exist or may have been moved.
         </p>
-        <Link to="/" className="btn btn-dark">← Back to JSTutor</Link>
+        <Link to="/" className="btn btn-dark">← Back to {branding.appName}</Link>
       </div>
     </>
   );

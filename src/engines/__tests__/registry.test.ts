@@ -7,6 +7,7 @@ import {
 } from '../registry';
 import type { LanguageEngine, LanguageId } from '../../types/engine';
 import { useStore } from '../../store/useStore';
+import { branding } from '../../config/branding';
 
 // ── Registry basics ──
 
@@ -15,8 +16,8 @@ describe('engine registry', () => {
     expect(SUPPORTED_LANGUAGES.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('SUPPORTED_LANGUAGES includes js', () => {
-    expect(SUPPORTED_LANGUAGES).toContain('js');
+  it('SUPPORTED_LANGUAGES includes the branding target language', () => {
+    expect(SUPPORTED_LANGUAGES).toContain(branding.languageId);
   });
 
   it('isLanguageId accepts every supported language', () => {
@@ -147,7 +148,13 @@ describe('store-registry integration', () => {
       useStore.getState().setLanguage(id);
       expect(useStore.getState().language).toBe(id);
     }
-    // Reset
-    useStore.getState().setLanguage('js');
+    // Reset to branding default
+    useStore.getState().setLanguage(branding.languageId);
+  });
+
+  it('store default language matches branding target', () => {
+    useStore.getState().reset();
+    // After reset, language should be whatever was set; fresh store should match branding
+    expect(branding.languageId).toBe(useStore.getState().language);
   });
 });

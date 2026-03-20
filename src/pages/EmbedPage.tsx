@@ -4,6 +4,7 @@ import { decodeShareCode } from '../utils/share';
 import { useStore } from '../store/useStore';
 import { runCode } from '../engine/executor';
 import { isLanguageId } from '../engines/registry';
+import { branding } from '../config/branding';
 import App from '../App';
 
 export default function EmbedPage() {
@@ -14,8 +15,8 @@ export default function EmbedPage() {
   const setLanguage = useStore((s) => s.setLanguage);
   const reset = useStore((s) => s.reset);
 
-  // Apply language from URL param (default to 'js' for legacy links)
-  const language = lang && isLanguageId(lang) ? lang : 'js';
+  // Apply language from URL param (default to build target for legacy links)
+  const language = lang && isLanguageId(lang) ? lang : branding.languageId;
 
   const code = useMemo(() => {
     if (!encoded) return null;

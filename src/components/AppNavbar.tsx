@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { getEngine, getEngineSync, SUPPORTED_LANGUAGES } from '../engines/registry';
 import { useEngine } from '../engines/useEngine';
+import { branding } from '../config/branding';
 import type { LanguageId } from '../types/engine';
 
 export default function AppNavbar() {
@@ -34,7 +35,7 @@ export default function AppNavbar() {
   return (
     <Navbar bg="dark" variant="dark" expand="md" className="px-3">
       <Navbar.Brand as={Link} to="/" className="fw-bold">
-        <span style={{ color: '#DD030B' }}>JS</span>Tutor
+        <span style={{ color: branding.brandColor }}>{branding.brandPrefix}</span>{branding.brandSuffix}
       </Navbar.Brand>
       <Navbar.Toggle aria-controls="navbar-nav" />
       <Navbar.Collapse id="navbar-nav">

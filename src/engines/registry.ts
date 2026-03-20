@@ -1,8 +1,15 @@
 import type { LanguageEngine, LanguageId } from '../types/engine';
 
-const engines: Record<LanguageId, () => Promise<LanguageEngine>> = {
-  js: async () => (await import('./js/index')).jsEngine,
-};
+const lang = import.meta.env.VITE_LANGUAGE || 'js';
+
+const engines: Record<string, () => Promise<LanguageEngine>> = {};
+
+if (lang === 'js') {
+  engines['js'] = async () => (await import('./js/index')).jsEngine;
+}
+if (lang === 'py') {
+  engines['py'] = async () => (await import('./py/index')).pyEngine;
+}
 
 const loaded = new Map<LanguageId, LanguageEngine>();
 

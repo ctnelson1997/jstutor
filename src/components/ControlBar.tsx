@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { runCode } from '../engine/executor';
 import { encodeShareCode } from '../utils/share';
+import { branding } from '../config/branding';
 
 const iconStyle = { width: 14, height: 14, fill: 'currentColor', verticalAlign: '-2px' } as const;
 
@@ -207,7 +208,7 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
             rel="noopener noreferrer"
             className="btn btn-sm btn-outline-primary"
           >
-            Edit in JSTutor ↗
+            Edit in {branding.appName} ↗
           </a>
         ) : (
           <>
@@ -238,7 +239,7 @@ export default function ControlBar({ embed = false }: { embed?: boolean }) {
         </Modal.Header>
         <Modal.Body>
           <p className="text-muted mb-3" style={{ fontSize: '0.875rem' }}>
-            Anyone with this link can view and step through your code. Paste it into a browser to open it in JSTutor.
+            Anyone with this link can view and step through your code. Paste it into a browser to open it in {branding.appName}.
           </p>
           <div className="d-flex gap-2">
             <Form.Control

@@ -4,6 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { getEngine } from './engines/registry';
+import { branding } from './config/branding';
 import App from './App';
 import ShareWarningPage from './pages/ShareWarningPage';
 import ExamplePage from './pages/ExamplePage';
@@ -14,8 +15,8 @@ import NotFoundPage from './pages/NotFoundPage';
 import ReportIssuePage from './pages/ReportIssuePage';
 import AppFooter from './components/AppFooter';
 
-// Eagerly load the JS engine so getEngineSync('js') is available immediately
-getEngine('js');
+// Eagerly load the target engine so getEngineSync() is available immediately
+getEngine(branding.languageId);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

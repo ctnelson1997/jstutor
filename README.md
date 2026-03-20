@@ -1,14 +1,14 @@
 # JSTutor
 
-A free, browser-based JavaScript execution visualizer. Write a snippet of JavaScript, step through it line by line, and watch the call stack, heap, and console update in real time.
+A free, browser-based code execution visualizer. Write a snippet of code, step through it line by line, and watch the call stack, heap, and console update in real time.
 
-**Live site:** [jstutor.org](https://jstutor.org)
+**Live sites:** [jstutor.org](https://jstutor.org) (JavaScript) · pytutor.org (Python — coming soon)
 
 ---
 
 ## What It Does
 
-JSTutor instruments your JavaScript code using an AST transform, runs it inside a sandboxed Web Worker, and captures a snapshot of program state at every step. You can then step forward and backward through execution to see exactly what the runtime is doing at each moment.
+JSTutor instruments your code using an AST transform, runs it inside a sandboxed Web Worker, and captures a snapshot of program state at every step. You can then step forward and backward through execution to see exactly what the runtime is doing at each moment.
 
 At each step the visualizer shows:
 
@@ -24,18 +24,29 @@ Everything runs in your browser. No server, no account, no data collection.
 
 ---
 
-## Architecture
+## Multi-Language Support
 
-The app is built around a **pluggable engine system** designed for multi-language support. Each language implements a `LanguageEngine` interface; the UI is language-agnostic.
+The app is built around a **pluggable engine system**. Each language implements a `LanguageEngine` interface; the UI is entirely language-agnostic. Build targets produce standalone single-language sites, each deployable to its own domain.
+
+| Target | Dev server | Production build | Output | Domain |
+|--------|-----------|-----------------|--------|--------|
+| JavaScript | `npm run dev:js` | `npm run build:js` | `docs/` | jstutor.org |
+| Python | `npm run dev:py` | `npm run build:py` | `docs-py/` | pytutor.org |
+
+Build targets use Vite's `--mode` flag, which loads per-language env files (`.env.js`, `.env.py`) containing branding variables (app name, color, domain, tagline). Each build bundles only its target engine — tree-shaking removes everything else.
+
+> **Note:** The Python engine is currently a mock that returns hardcoded snapshots. A real engine (e.g. Pyodide/WASM) is planned.
+
+---
+
+## Architecture
 
 ```
 User Code (CodeMirror editor)
         │
         ▼
-LanguageEngine.execute(source)   (src/engines/js/)
-  Instrumenter  — Acorn AST transform injecting runtime hooks
-  Runtime       — JS preamble for state capture & serialization
-  Web Worker    — disposable blob URL, killed after 10s / 5,000 snapshots
+LanguageEngine.execute(source)   (src/engines/<lang>/)
+  [language-specific pipeline]
         │
         ▼
 ExecutionSnapshot[]
@@ -49,7 +60,7 @@ React UI  (src/components/)
   EditorPanel  ·  FramesView  ·  HeapView  ·  PointerArrows  ·  ConsolePanel
 ```
 
-Currently JavaScript is the only engine. Adding a new language requires implementing a `LanguageEngine` under `src/engines/<lang>/` and registering it in `src/engines/registry.ts`.
+The JavaScript engine uses Acorn for AST instrumentation, a runtime preamble for state capture, and disposable blob-URL Web Workers for sandboxed execution. Future language engines may use WASM-based interpreters (e.g. Pyodide for Python).
 
 ---
 
@@ -61,16 +72,22 @@ Currently JavaScript is the only engine. Adding a new language requires implemen
 git clone https://github.com/<your-org>/jstutor.git
 cd jstutor
 npm install
-npm run dev          # dev server at http://localhost:3000
+npm run dev          # JS dev server at http://localhost:3000
+npm run dev:py       # Python dev server (mock engine)
 ```
 
-### Other commands
+### Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start Vite dev server with HMR |
-| `npm run build` | Type-check + build to `docs/` |
-| `npm run test` | Run tests (Vitest, 125 tests) |
+| `npm run dev` | JS dev server (alias for `dev:js`) |
+| `npm run dev:js` | JS dev server with HMR |
+| `npm run dev:py` | Python dev server with HMR |
+| `npm run build` | JS type-check + build to `docs/` |
+| `npm run build:js` | Same as `build` |
+| `npm run build:py` | Python build to `docs-py/` |
+| `npm run build:all` | Build all language targets |
+| `npm run test` | Run tests (Vitest, 166 tests) |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build locally |
 
@@ -80,19 +97,25 @@ npm run dev          # dev server at http://localhost:3000
 
 ```
 src/
+├── config/
+│   └── branding.ts             # Build-time branding (reads VITE_* env vars)
 ├── engines/                    # Pluggable language engine system
 │   ├── registry.ts             # getEngine(), getEngineSync(), SUPPORTED_LANGUAGES
-│   └── js/                     # JavaScript engine
+│   ├── js/                     # JavaScript engine
+│   │   ├── index.ts            # LanguageEngine implementation
+│   │   ├── instrumenter.ts     # Acorn AST transform — injects runtime hooks
+│   │   ├── runtime.ts          # Worker preamble: __capture__, serialization, heap registry
+│   │   ├── executor.ts         # instrument → worker → snapshots (no store coupling)
+│   │   ├── examples.ts         # Built-in JS example snippets
+│   │   └── security.ts         # Suspicious code pattern detection
+│   └── py/                     # Python engine (mock)
 │       ├── index.ts            # LanguageEngine implementation
-│       ├── instrumenter.ts     # Acorn AST transform — injects runtime hooks
-│       ├── runtime.ts          # Worker preamble: __capture__, serialization, heap registry
-│       ├── executor.ts         # instrument → worker → snapshots (no store coupling)
-│       ├── examples.ts         # Built-in JS example snippets
-│       └── security.ts         # Suspicious code pattern detection
+│       ├── executor.ts         # Mock executor — hardcoded snapshots
+│       └── examples.ts         # Python example snippets
 ├── engine/
 │   └── executor.ts             # Thin dispatcher: store → engine → store
 ├── components/
-│   ├── AppNavbar.tsx           # Navbar (Sandbox / Examples / Language selector / About)
+│   ├── AppNavbar.tsx           # Navbar (Sandbox / Examples / About) — branding-driven
 │   ├── ControlBar.tsx          # Visualize / step controls / share / embed
 │   ├── EditorPanel.tsx         # CodeMirror editor with line/sub-line highlight + condition badges
 │   ├── VisualizationPanel.tsx
@@ -101,7 +124,7 @@ src/
 │   ├── PointerArrows.tsx       # SVG overlay drawing reference arrows
 │   └── ConsolePanel.tsx        # Captured console output
 ├── pages/
-│   ├── AboutPage.tsx           # About / usage guide
+│   ├── AboutPage.tsx           # About / usage guide (branding-driven)
 │   ├── ExamplePage.tsx         # Loads a built-in example by slug
 │   ├── ShareWarningPage.tsx    # Security interstitial for shared-code links
 │   └── EmbedPage.tsx           # Iframe-friendly embed mode
@@ -115,12 +138,22 @@ src/
 │   └── diffSnapshots.ts        # Detects changed values between steps (yellow flash)
 ├── App.tsx                     # Main layout (resizable split, keyboard shortcuts)
 ├── main.tsx                    # React entry point + HashRouter routes
+├── env.d.ts                    # TypeScript declarations for VITE_* env vars
 └── index.css                   # Custom styles (layout, animations, condition badges, scope sections)
+
+# Root config files
+.env.js                         # JS build branding (VITE_APP_NAME=JSTutor, etc.)
+.env.py                         # Python build branding (VITE_APP_NAME=PyTutor, etc.)
+vite.config.ts                  # Build config — mode-based outDir + language targeting
 ```
 
 ---
 
 ## Key Design Decisions
+
+**Single-language builds** — each `npm run build:<lang>` produces a standalone site bundling only that language's engine. Vite's `--mode` flag loads the matching `.env.<mode>` file, and `import.meta.env.VITE_LANGUAGE` is statically replaced at build time so tree-shaking eliminates the unused engines entirely.
+
+**Branding via env vars** — app name, colors, domain, and tagline are defined in `.env.js` / `.env.py` and flow through `src/config/branding.ts` to all components. No hardcoded "JSTutor" strings exist in the UI code.
 
 **Native JS in a Web Worker** — code runs as real JavaScript, not an interpreter, so the full Web API surface is available and execution is fast.
 
@@ -141,9 +174,9 @@ src/
 ## Built With
 
 - [React](https://react.dev) 19 + [TypeScript](https://www.typescriptlang.org) 5.9
-- [Vite](https://vite.dev) 7 — build tooling, dev server, HMR
+- [Vite](https://vite.dev) 7 — build tooling, dev server, HMR, multi-mode builds
 - [React Bootstrap](https://react-bootstrap.github.io) / [Bootstrap](https://getbootstrap.com) 5
-- [CodeMirror 6](https://codemirror.net) — code editor
+- [CodeMirror 6](https://codemirror.net) — code editor (with `@codemirror/lang-javascript` and `@codemirror/lang-python`)
 - [Acorn](https://github.com/acornjs/acorn) — JavaScript parser (AST instrumentation)
 - [Astring](https://github.com/davidbonnet/astring) — JavaScript code generator
 - [Zustand](https://zustand.docs.pmnd.rs) — state management
@@ -154,16 +187,15 @@ src/
 
 ## Deployment
 
-The site is deployed via **GitHub Pages** from the `docs/` folder.
+Each language target builds to its own output directory and deploys to its own domain via GitHub Pages:
 
 ```bash
-npm run build      # outputs to docs/
-git add docs/
-git commit -m "deploy"
-git push
+npm run build:js     # outputs to docs/  → jstutor.org
+npm run build:py     # outputs to docs-py/ → pytutor.org
+npm run build:all    # build everything
 ```
 
-GitHub Pages serves `docs/` at [jstutor.org](https://jstutor.org) (configured via `docs/CNAME`). HashRouter is used so all routes resolve correctly without server rewrites.
+GitHub Pages serves `docs/` at [jstutor.org](https://jstutor.org) (configured via `docs/CNAME`). Non-JS output directories (`docs-*/`) are gitignored and deployed separately to their respective domains. HashRouter is used so all routes resolve correctly without server rewrites.
 
 ---
 

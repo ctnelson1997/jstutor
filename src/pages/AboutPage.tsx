@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import AppNavbar from '../components/AppNavbar';
+import { branding } from '../config/branding';
 
 export default function AboutPage() {
   return (
@@ -7,22 +8,22 @@ export default function AboutPage() {
       <AppNavbar />
       <div className="container py-5" style={{ maxWidth: '760px' }}>
         <h1 className="fw-bold mb-1">
-          <span style={{ color: '#DD030B' }}>JS</span>Tutor
+          <span style={{ color: branding.brandColor }}>{branding.brandPrefix}</span>{branding.brandSuffix}
         </h1>
         <p className="text-muted mb-4">Authored by <a target='_blank' href='https://coletnelson.us'>Cole Nelson</a> of the <a target='_blank' href='https://www.cs.wisc.edu/'>University of Wisconsin-Madison</a></p>
 
         <section className="mb-4">
-          <h2>What is JSTutor?</h2>
+          <h2>What is {branding.appName}?</h2>
           <p>
-            JSTutor is a browser-based tool that helps you understand how JavaScript code executes
-            step by step. Write a snippet of JavaScript, press <strong>Visualize</strong> (or{' '}
+            {branding.appName} is a browser-based tool that helps you understand how {branding.languageDisplayName} code executes
+            step by step. Write a snippet of {branding.languageDisplayName}, press <strong>Visualize</strong> (or{' '}
             <kbd>Shift+Enter</kbd>), and then step through each line to see exactly what happens to
             the call stack, local variables, heap objects, and console output at every moment in
             time.
           </p>
           <p>
             It's designed for students learning programming, developers debugging tricky code, and
-            anyone who wants a clearer mental model of how JavaScript actually works under the hood.
+            anyone who wants a clearer mental model of how {branding.languageDisplayName} actually works under the hood.
           </p>
         </section>
 
@@ -33,7 +34,7 @@ export default function AboutPage() {
               {
                 n: 1,
                 title: 'Write or load code',
-                body: <>Type JavaScript in the editor, or pick an example from the <strong>Examples</strong> menu in the navbar.</>,
+                body: <>Type {branding.languageDisplayName} in the editor, or pick an example from the <strong>Examples</strong> menu in the navbar.</>,
               },
               {
                 n: 2,
@@ -55,7 +56,7 @@ export default function AboutPage() {
                       {[
                         { label: 'Call Stack', desc: 'active frames & block scopes with live variable values' },
                         { label: 'Heap', desc: 'objects & arrays in memory, with pointer arrows' },
-                        { label: 'Console', desc: 'output from console.log calls' },
+                        { label: 'Console', desc: 'output from print calls' },
                       ].map(({ label, desc }) => (
                         <div key={label} className="border rounded px-3 py-2 flex-fill" style={{ minWidth: '180px', background: '#f8f9fa' }}>
                           <div className="fw-semibold" style={{ fontSize: '0.85rem' }}>{label}</div>
@@ -75,7 +76,7 @@ export default function AboutPage() {
               <div key={n} className="d-flex gap-3 align-items-start">
                 <div
                   className="fw-bold text-white rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: 32, height: 32, background: '#DD030B', fontSize: '0.9rem', marginTop: 2 }}
+                  style={{ width: 32, height: 32, background: branding.brandColor, fontSize: '0.9rem', marginTop: 2 }}
                 >
                   {n}
                 </div>
@@ -102,7 +103,7 @@ export default function AboutPage() {
                 className="border rounded px-3 py-2 d-flex align-items-start gap-2"
                 style={{ background: '#f8f9fa', fontSize: '0.9rem', flex: '1 1 260px' }}
               >
-                <span style={{ color: '#DD030B', fontSize: '1rem', lineHeight: 1.6, flexShrink: 0 }}>{icon}</span>
+                <span style={{ color: branding.brandColor, fontSize: '1rem', lineHeight: 1.6, flexShrink: 0 }}>{icon}</span>
                 <span className="text-muted">{text}</span>
               </div>
             ))}
@@ -129,8 +130,6 @@ export default function AboutPage() {
               { href: 'https://vite.dev', label: 'Vite', desc: 'build tooling' },
               { href: 'https://react-bootstrap.github.io', label: 'React Bootstrap', desc: 'UI components' },
               { href: 'https://codemirror.net', label: 'CodeMirror 6', desc: 'code editor' },
-              { href: 'https://github.com/acornjs/acorn', label: 'Acorn', desc: 'JS parser / AST' },
-              { href: 'https://github.com/davidbonnet/astring', label: 'Astring', desc: 'code generator' },
               { href: 'https://zustand.docs.pmnd.rs', label: 'Zustand', desc: 'state management' },
               { href: 'https://reactrouter.com', label: 'React Router', desc: 'client-side routing' },
               { href: 'https://github.com/pieroxy/lz-string', label: 'lz-string', desc: 'URL compression' },
@@ -143,7 +142,7 @@ export default function AboutPage() {
                 className="border rounded px-3 py-2 text-decoration-none"
                 style={{ background: '#f8f9fa', flex: '0 0 auto' }}
               >
-                <span className="fw-semibold" style={{ fontSize: '0.85rem', color: '#DD030B' }}>{label}</span>
+                <span className="fw-semibold" style={{ fontSize: '0.85rem', color: branding.brandColor }}>{label}</span>
                 <span className="text-muted ms-2" style={{ fontSize: '0.8rem' }}>{desc}</span>
               </a>
             ))}

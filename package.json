@@ -4,8 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite --mode js",
+    "dev:js": "vite --mode js",
+    "dev:py": "vite --mode py",
+    "build": "tsc -b && vite build --mode js",
+    "build:js": "tsc -b && vite build --mode js",
+    "build:py": "tsc -b && vite build --mode py",
+    "build:all": "npm run build:js && npm run build:py",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
@@ -13,6 +18,7 @@
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-python": "^6.2.1",
     "@uiw/react-codemirror": "^4.25.7",
     "acorn": "^8.16.0",
     "acorn-walk": "^8.3.5",

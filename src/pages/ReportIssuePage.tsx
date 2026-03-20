@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom';
 import AppNavbar from '../components/AppNavbar';
+import { branding } from '../config/branding';
 
-const BRAND = '#DD030B';
+const BRAND = branding.brandColor;
 
 export default function ReportIssuePage() {
   return (
@@ -10,7 +11,7 @@ export default function ReportIssuePage() {
       <div className="container py-5" style={{ maxWidth: '760px' }}>
         <h1 className="fw-bold mb-1">Report an Issue</h1>
         <p className="text-muted mb-4" style={{ fontSize: '0.92rem' }}>
-          Help make <span style={{ color: BRAND, fontWeight: 600 }}>JS</span>Tutor better —
+          Help make <span style={{ color: BRAND, fontWeight: 600 }}>{branding.brandPrefix}</span>{branding.brandSuffix} better —
           bug reports and feature ideas are always welcome.
         </p>
 

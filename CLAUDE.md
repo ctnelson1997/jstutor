@@ -2,32 +2,48 @@
 
 ## What This Is
 
-JSTutor is a **client-side-only** React app that visualizes JavaScript execution step-by-step. Students write JS snippets in a CodeMirror editor and see call stack, variables, heap objects, and console output at every line. No backend — everything runs in the browser.
+A **client-side-only** React app that visualizes code execution step-by-step. Students write code in a CodeMirror editor and see call stack, variables, heap objects, and console output at every line. No backend — everything runs in the browser.
 
-The architecture is designed for **multi-language support**: the JS engine is behind a `LanguageEngine` interface so additional languages (Python, TypeScript, etc.) can be plugged in by adding an engine under `src/engines/`.
+The architecture supports **multi-language builds**: each language has a `LanguageEngine` under `src/engines/`, and the Vite build system produces a standalone single-language site per target. Each target deploys to its own domain (e.g. jstutor.org, pytutor.org).
 
 ## Commands
 
 ```bash
-npm run dev        # Vite dev server (localhost:3000)
-npm run build      # tsc -b && vite build (outputs to docs/)
-npm run test       # vitest run (125 tests, ~3.5s)
-npm test:watch     # vitest in watch mode
-npm run lint       # ESLint
+npm run dev          # JS dev server (localhost:3000), alias for dev:js
+npm run dev:js       # JS dev server
+npm run dev:py       # Python dev server
+npm run build        # JS production build (tsc + vite, outputs to docs/)
+npm run build:js     # Same as above
+npm run build:py     # Python production build (outputs to docs-py/)
+npm run build:all    # Build all language targets
+npm run test         # vitest run (166 tests, ~4.5s)
+npm run test:watch   # vitest in watch mode
+npm run lint         # ESLint
 ```
+
+Build targets use Vite's `--mode` flag, which loads the corresponding `.env.<mode>` file (`.env.js`, `.env.py`). The env file sets `VITE_LANGUAGE`, `VITE_APP_NAME`, branding colors, domain, etc.
 
 ## Architecture
 
 ```
 User code
   -> LanguageEngine.execute(source)
-    -> Instrumenter (Acorn AST transform)
-    -> Runtime preamble + instrumented code
-    -> Disposable Web Worker (blob URL)
+    -> [language-specific pipeline]
     -> ExecutionSnapshot[]
   -> Zustand store
-  -> React UI
+  -> React UI (language-agnostic)
 ```
+
+### Build-Time Language Targeting
+
+Each build bundles **only one language engine**. Controlled by:
+
+- **`.env.js` / `.env.py`** — per-language env vars (name, color, domain, tagline)
+- **`src/config/branding.ts`** — reads `import.meta.env.VITE_*`, single source of truth for all UI branding
+- **`src/engines/registry.ts`** — conditionally registers only the target engine based on `import.meta.env.VITE_LANGUAGE`; Vite tree-shakes the unused engine's code out of the bundle
+- **`vite.config.ts`** — function form; `mode` determines `outDir` (`docs/` for JS, `docs-py/` for Python)
+
+All hardcoded "JSTutor" references and `#DD030B` colors have been replaced with `branding.*` imports. To add a new language target, create a new `.env.<lang>` file and add corresponding `dev:<lang>` / `build:<lang>` scripts.
 
 ### Engine Layer (`src/engines/`)
 
@@ -43,6 +59,10 @@ src/engines/
     executor.ts            # execute(source) -> Promise<WorkerMessage> (no store coupling)
     examples.ts            # 11 JS examples with language:'js' field
     security.ts            # analyzeCode() — regex-based suspicious pattern detection
+  py/
+    index.ts               # pyEngine: LanguageEngine (mock — returns hardcoded snapshots)
+    executor.ts            # Mock execute() — static snapshots regardless of input
+    examples.ts            # 3 Python examples with language:'py' field
 ```
 
 The **dispatcher** at `src/engine/executor.ts` is a thin layer that reads `language` from the store, calls `getEngine(language)`, delegates to `engine.execute()`, and updates the store. All UI components import `runCode` from here.
@@ -50,13 +70,18 @@ The **dispatcher** at `src/engine/executor.ts` is a thin layer that reads `langu
 ### Adding a New Language
 
 1. Create `src/engines/<lang>/` with an `index.ts` exporting a `LanguageEngine` object
-2. Add one line to `src/engines/registry.ts`
+2. Add a conditional registration block in `src/engines/registry.ts`
 3. Expand `LanguageId` type in `src/types/engine.ts`
-4. The language selector dropdown in AppNavbar automatically appears when 2+ engines exist
+4. Create `.env.<lang>` with branding vars (`VITE_LANGUAGE`, `VITE_APP_NAME`, `VITE_BRAND_COLOR`, etc.)
+5. Add `dev:<lang>` and `build:<lang>` scripts to `package.json`
+
+### Branding (`src/config/branding.ts`)
+
+All UI branding (app name, colors, tagline, domain) flows from `import.meta.env.VITE_*` variables through a single `branding` object. Components import `branding` instead of using hardcoded strings. The env vars are set per build target via `.env.js` / `.env.py` files loaded by Vite's `--mode` flag.
 
 ### Store (`src/store/useStore.ts`)
 
-Zustand store with: `language`, `code`, `snapshots`, `currentStep`, `isRunning`, `error`, `hideFunctions`. The `language` field drives which engine is used and which editor extension / examples / sandbox code are shown.
+Zustand store with: `language`, `code`, `snapshots`, `currentStep`, `isRunning`, `error`, `hideFunctions`. The `language` field defaults to `branding.languageId` and drives which engine is used and which editor extension / examples / sandbox code are shown.
 
 ### Routing (`src/main.tsx`)
 
@@ -64,15 +89,15 @@ HashRouter with language-parameterized routes:
 
 ```
 /                           Main editor
-/examples/:slug             JS example (legacy compat)
+/examples/:slug             Example (legacy compat)
 /examples/:lang/:slug       Language-specific example
-/share/:encoded             Shared code (legacy, defaults to JS)
+/share/:encoded             Shared code (legacy, defaults to build target)
 /share/:lang/:encoded       Language-specific shared code
 /embed/:encoded             Embed (legacy)
 /embed/:lang/:encoded       Language-specific embed
 ```
 
-Share URLs include the language in the path: `#/share/js/v1~<compressed>`.
+Legacy routes (without `:lang`) default to `branding.languageId` — the build target language.
 
 ## TypeScript Constraints
 
@@ -85,7 +110,7 @@ Share URLs include the language in the path: `#/share/js/v1~<compressed>`.
 
 **Framework**: Vitest 4.x (reads `vite.config.ts` automatically, no separate config needed).
 
-**Test suites** (125 tests total):
+**Test suites** (166 tests total):
 
 | Suite | Location | What it tests |
 |---|---|---|
@@ -94,13 +119,19 @@ Share URLs include the language in the path: `#/share/js/v1~<compressed>`.
 | diffSnapshots | `src/utils/__tests__/diffSnapshots.test.ts` | `getChangedKeys()`: variable changes, heap property changes, closure vars, this context |
 | Share | `src/utils/__tests__/share.test.ts` | `encodeShareCode`/`decodeShareCode` round-trips + `analyzeCode` suspicious pattern detection |
 | Store | `src/store/__tests__/useStore.test.ts` | Zustand actions: step navigation, clamping, reset, error handling |
+| Registry | `src/engines/__tests__/registry.test.ts` | Engine loading, contract validation, branding-store integration |
+| Branding | `src/config/__tests__/branding.test.ts` | Branding field shape, types, defaults, hex color validation |
+| Python Engine | `src/engines/py/__tests__/engine.test.ts` | Engine contract, mock executor snapshot structure, example validation |
 
 **Important: `fileParallelism: false`** is set in `vite.config.ts`. The `@vitejs/plugin-react` Babel initialization races across parallel worker threads on Windows, causing intermittent "Cannot read properties of undefined (reading 'config')" failures. Do not remove this setting.
 
 Pipeline tests use `node:vm` (`createContext` + `runInContext`) instead of `eval` because Vitest's ESM transform strips the `eval` identifier. Each pipeline test gets a fresh sandboxed context with needed builtins (Map, Set, Array, Date, etc.) so there's no global state leakage between tests.
 
+Note: In test mode, `VITE_LANGUAGE` is unset so branding defaults to JS. The Python engine is tested directly via its own test file rather than through the registry.
+
 ## Key Design Notes
 
+- **Single-language builds** — each build bundles only its target engine; tree-shaking removes unused engines
 - **Native JS in Web Worker** (not QuickJS/WASM) for full Web API support
 - **Disposable blob-URL workers** per execution — fresh global scope each run
 - **TDZ-aware instrumentation** — `let`/`const` tracked incrementally; `var`/`function` hoisted
@@ -110,9 +141,17 @@ Pipeline tests use `node:vm` (`createContext` + `runInContext`) instead of `eval
 - **Snapshot limit**: 5000 per execution, worker killed after 10 seconds
 - **Security**: shared links show warning interstitial, `eval` blocked, static analysis flags suspicious APIs
 - **`HeapObjectType`** is an open string union — engines can emit custom types (e.g. Python's `dict`, `tuple`)
-- **JS engine eagerly loaded** at startup in `main.tsx` so `getEngineSync('js')` is always available
+- **Target engine eagerly loaded** at startup in `main.tsx` via `getEngine(branding.languageId)`
+- **Python engine is a mock** — returns hardcoded snapshots regardless of input; a real engine (Pyodide, etc.) is a future task
 - `acorn-walk` is an unused legacy dependency — can be removed
 
 ## Deployment
 
-GitHub Pages from the `docs/` folder. The Vite build outputs there (`build.outDir: 'docs'`).
+Each language target builds to its own output directory and deploys to its own domain:
+
+| Language | Build command | Output dir | Domain |
+|----------|--------------|------------|--------|
+| JavaScript | `npm run build:js` | `docs/` | jstutor.org |
+| Python | `npm run build:py` | `docs-py/` | pytutor.org |
+
+GitHub Pages serves `docs/` for the JS site. Non-JS output directories (`docs-*/`) are gitignored and deployed separately.

@@ -1,7 +1,7 @@
 import type { Extension } from '@codemirror/state';
 import type { WorkerMessage } from './snapshot';
 
-export type LanguageId = 'js';
+export type LanguageId = 'js' | 'py';
 
 export interface CodeExample {
   title: string;
