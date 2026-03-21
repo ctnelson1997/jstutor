@@ -154,8 +154,13 @@ export default function EditorPanel() {
         effects.push(setHighlightLine.of(highlightInfo));
       }
 
-      // Always sync condition badge (covers same-line result changes)
-      effects.push(setCondition.of(condition));
+      // Sync condition badge only when it changed (dispatching unconditionally
+      // would re-trigger onUpdate, causing infinite recursion / stack overflow).
+      const currentConditionSet = view.state.field(conditionField);
+      const hasConditionDeco = currentConditionSet.iter().value !== null;
+      if (condition !== null || hasConditionDeco) {
+        effects.push(setCondition.of(condition));
+      }
 
       if (effects.length > 0) {
         view.dispatch({ effects });

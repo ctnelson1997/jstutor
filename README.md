@@ -2,19 +2,19 @@
 
 A free, browser-based code execution visualizer. Write a snippet of code, step through it line by line, and watch the call stack, heap, and console update in real time.
 
-**Live sites:** [jstutor.org](https://jstutor.org) (JavaScript) · pytutor.org (Python — coming soon)
+**Live sites:** [jstutor.org](https://jstutor.org) (JavaScript) · [pytutor.org](https://pytutor.org) (Python)
 
 ---
 
 ## What It Does
 
-JSTutor instruments your code using an AST transform, runs it inside a sandboxed Web Worker, and captures a snapshot of program state at every step. You can then step forward and backward through execution to see exactly what the runtime is doing at each moment.
+JSTutor instruments your code, runs it inside a sandboxed Web Worker, and captures a snapshot of program state at every step. You can then step forward and backward through execution to see exactly what the runtime is doing at each moment.
 
 At each step the visualizer shows:
 
 - **Call Stack** — active function frames and block scopes with live variable values, closures, and `this` context
 - **Heap** — objects, arrays, functions, classes, Maps, Sets, and more displayed as cards with pointer arrows linking references (filterable by all frames / current frame, with an option to hide function objects)
-- **Console** — output from `console.log` / `console.warn` / `console.error`
+- **Console** — output from `console.log` / `print()`
 - **Condition badges** — `true`/`false` pills annotated directly in the editor for `if`/`else if` and loop conditions
 - **Value change detection** — variables that changed between steps flash yellow so you can spot what just updated
 - **Sub-line highlighting** — for-loop init, condition, and update clauses are individually highlighted as they execute
@@ -35,7 +35,7 @@ The app is built around a **pluggable engine system**. Each language implements 
 
 Build targets use Vite's `--mode` flag, which loads per-language env files (`.env.js`, `.env.py`) containing branding variables (app name, color, domain, tagline). Each build bundles only its target engine — tree-shaking removes everything else.
 
-> **Note:** The Python engine is currently a mock that returns hardcoded snapshots. A real engine (e.g. Pyodide/WASM) is planned.
+The **JavaScript engine** uses Acorn AST transformation to inject tracing hooks, then runs the instrumented code in disposable blob-URL Web Workers. The **Python engine** uses [Pyodide](https://pyodide.org) (CPython compiled to WebAssembly) with `sys.settrace()` to intercept execution events, running in a persistent module Web Worker. Pyodide (~12 MB) is loaded eagerly from CDN at page load so it's ready by the time the user clicks "Visualize".
 
 ---
 
@@ -60,7 +60,7 @@ React UI  (src/components/)
   EditorPanel  ·  FramesView  ·  HeapView  ·  PointerArrows  ·  ConsolePanel
 ```
 
-The JavaScript engine uses Acorn for AST instrumentation, a runtime preamble for state capture, and disposable blob-URL Web Workers for sandboxed execution. Future language engines may use WASM-based interpreters (e.g. Pyodide for Python).
+The **JavaScript engine** uses Acorn for AST instrumentation, a runtime preamble for state capture, and disposable blob-URL Web Workers for sandboxed execution. The **Python engine** uses Pyodide (CPython/WASM) with `sys.settrace()` in a persistent module Web Worker for step-by-step tracing.
 
 ---
 
@@ -73,7 +73,7 @@ git clone https://github.com/<your-org>/jstutor.git
 cd jstutor
 npm install
 npm run dev          # JS dev server at http://localhost:3000
-npm run dev:py       # Python dev server (mock engine)
+npm run dev:py       # Python dev server
 ```
 
 ### Commands
@@ -87,7 +87,7 @@ npm run dev:py       # Python dev server (mock engine)
 | `npm run build:js` | Same as `build` |
 | `npm run build:py` | Python build to `docs-py/` |
 | `npm run build:all` | Build all language targets |
-| `npm run test` | Run tests (Vitest, 166 tests) |
+| `npm run test` | Run tests (Vitest, 263 tests) |
 | `npm run lint` | Run ESLint |
 | `npm run preview` | Preview the production build locally |
 
@@ -108,10 +108,13 @@ src/
 │   │   ├── executor.ts         # instrument → worker → snapshots (no store coupling)
 │   │   ├── examples.ts         # Built-in JS example snippets
 │   │   └── security.ts         # Suspicious code pattern detection
-│   └── py/                     # Python engine (mock)
+│   └── py/                     # Python engine (Pyodide + sys.settrace)
 │       ├── index.ts            # LanguageEngine implementation
-│       ├── executor.ts         # Mock executor — hardcoded snapshots
-│       └── examples.ts         # Python example snippets
+│       ├── tracer.ts           # Python tracing script (sys.settrace) as a string
+│       ├── worker.ts           # Persistent Pyodide Web Worker (module worker)
+│       ├── executor.ts         # Pyodide worker lifecycle management
+│       ├── examples.ts         # Python example snippets
+│       └── security.ts         # Suspicious code pattern detection
 ├── engine/
 │   └── executor.ts             # Thin dispatcher: store → engine → store
 ├── components/
@@ -155,9 +158,9 @@ vite.config.ts                  # Build config — mode-based outDir + language 
 
 **Branding via env vars** — app name, colors, domain, and tagline are defined in `.env.js` / `.env.py` and flow through `src/config/branding.ts` to all components. No hardcoded "JSTutor" strings exist in the UI code.
 
-**Native JS in a Web Worker** — code runs as real JavaScript, not an interpreter, so the full Web API surface is available and execution is fast.
+**JS engine: Native JS in disposable Web Workers** — code runs as real JavaScript in blob-URL workers, so the full Web API surface is available. A fresh worker is created for each run; no shared state can leak between executions.
 
-**Disposable blob-URL workers** — a fresh worker is created for each run and terminated afterward; no shared state can leak between executions.
+**Python engine: Pyodide + sys.settrace** — CPython compiled to WebAssembly runs in a persistent module Web Worker. Python's built-in `sys.settrace()` intercepts call/line/return events to build snapshots without needing an AST transformer. Pyodide is loaded eagerly from CDN at page load to minimize wait time on first run.
 
 **TDZ-aware instrumentation** — `let`/`const` declarations are tracked incrementally so the visualizer never reads variables before they are initialized.
 
@@ -179,6 +182,7 @@ vite.config.ts                  # Build config — mode-based outDir + language 
 - [CodeMirror 6](https://codemirror.net) — code editor (with `@codemirror/lang-javascript` and `@codemirror/lang-python`)
 - [Acorn](https://github.com/acornjs/acorn) — JavaScript parser (AST instrumentation)
 - [Astring](https://github.com/davidbonnet/astring) — JavaScript code generator
+- [Pyodide](https://pyodide.org) — CPython compiled to WebAssembly (Python engine, loaded from CDN)
 - [Zustand](https://zustand.docs.pmnd.rs) — state management
 - [React Router](https://reactrouter.com) 7 — client-side routing (HashRouter)
 - [lz-string](https://github.com/pieroxy/lz-string) — URL-compressed share links

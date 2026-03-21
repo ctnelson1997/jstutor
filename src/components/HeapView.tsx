@@ -124,7 +124,7 @@ function HeapCard({ obj, changedKeys, step, typeConfig }: { obj: HeapObject; cha
         </span>
       </Card.Header>
       <Card.Body>
-        {obj.objectType === 'array' ? (
+        {obj.objectType === 'array' || obj.objectType === 'list' || obj.objectType === 'tuple' ? (
           <ArrayDisplay obj={obj} changedKeys={changedKeys} step={step} />
         ) : obj.objectType === 'function' ? (
           <FunctionDisplay obj={obj} />

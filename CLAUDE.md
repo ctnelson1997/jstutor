@@ -60,9 +60,12 @@ src/engines/
     examples.ts            # 11 JS examples with language:'js' field
     security.ts            # analyzeCode() — regex-based suspicious pattern detection
   py/
-    index.ts               # pyEngine: LanguageEngine (mock — returns hardcoded snapshots)
-    executor.ts            # Mock execute() — static snapshots regardless of input
-    examples.ts            # 3 Python examples with language:'py' field
+    index.ts               # pyEngine: LanguageEngine (real Pyodide-based engine)
+    tracer.ts              # getTracerCode() — Python sys.settrace() script as a string
+    worker.ts              # Persistent module Web Worker — loads Pyodide from CDN, runs traced code
+    executor.ts            # execute(source) -> Promise<WorkerMessage> — manages persistent worker lifecycle
+    examples.ts            # 11 Python examples with language:'py' field
+    security.ts            # analyzeCode() — regex-based suspicious pattern detection for Python
 ```
 
 The **dispatcher** at `src/engine/executor.ts` is a thin layer that reads `language` from the store, calls `getEngine(language)`, delegates to `engine.execute()`, and updates the store. All UI components import `runCode` from here.
@@ -110,7 +113,7 @@ Legacy routes (without `:lang`) default to `branding.languageId` — the build t
 
 **Framework**: Vitest 4.x (reads `vite.config.ts` automatically, no separate config needed).
 
-**Test suites** (166 tests total):
+**Test suites** (263 tests total):
 
 | Suite | Location | What it tests |
 |---|---|---|
@@ -121,9 +124,11 @@ Legacy routes (without `:lang`) default to `branding.languageId` — the build t
 | Store | `src/store/__tests__/useStore.test.ts` | Zustand actions: step navigation, clamping, reset, error handling |
 | Registry | `src/engines/__tests__/registry.test.ts` | Engine loading, contract validation, branding-store integration |
 | Branding | `src/config/__tests__/branding.test.ts` | Branding field shape, types, defaults, hex color validation |
-| Python Engine | `src/engines/py/__tests__/engine.test.ts` | Engine contract, mock executor snapshot structure, example validation |
+| Python Engine | `src/engines/py/__tests__/engine.test.ts` | Engine contract, heapTypeConfig shape, example validation, analyzeCode integration |
+| Python Tracer | `src/engines/py/__tests__/tracer.test.ts` | Tracer script structure: settrace events, serialization, limits, security sandbox, baseline filtering |
+| Python Security | `src/engines/py/__tests__/security.test.ts` | All suspicious patterns, false positive avoidance, edge cases |
 
-**Important: `fileParallelism: false`** is set in `vite.config.ts`. The `@vitejs/plugin-react` Babel initialization races across parallel worker threads on Windows, causing intermittent "Cannot read properties of undefined (reading 'config')" failures. Do not remove this setting.
+**Note**: The project uses `@vitejs/plugin-react-swc` (SWC) instead of `@vitejs/plugin-react` (Babel). The Babel plugin had a global init race condition on Windows that caused intermittent "Cannot read properties of undefined (reading 'config')" test failures. SWC is a drop-in replacement that eliminates this issue.
 
 Pipeline tests use `node:vm` (`createContext` + `runInContext`) instead of `eval` because Vitest's ESM transform strips the `eval` identifier. Each pipeline test gets a fresh sandboxed context with needed builtins (Map, Set, Array, Date, etc.) so there's no global state leakage between tests.
 
@@ -132,8 +137,8 @@ Note: In test mode, `VITE_LANGUAGE` is unset so branding defaults to JS. The Pyt
 ## Key Design Notes
 
 - **Single-language builds** — each build bundles only its target engine; tree-shaking removes unused engines
-- **Native JS in Web Worker** (not QuickJS/WASM) for full Web API support
-- **Disposable blob-URL workers** per execution — fresh global scope each run
+- **JS engine**: Native JS in disposable blob-URL Web Workers — fresh global scope each run
+- **Python engine**: Pyodide (CPython compiled to WASM) in a persistent module Web Worker — `sys.settrace()` intercepts execution events to build snapshots; Pyodide is loaded eagerly from CDN at page load
 - **TDZ-aware instrumentation** — `let`/`const` tracked incrementally; `var`/`function` hoisted
 - **Block scopes** — Loops with `let`/`const` use `isBlockScope` flag, rendered nested inside parent frame
 - **Condition tracking** — `__condition__()` wraps if/else-if tests, emits snapshots with `condition` field
@@ -142,7 +147,7 @@ Note: In test mode, `VITE_LANGUAGE` is unset so branding defaults to JS. The Pyt
 - **Security**: shared links show warning interstitial, `eval` blocked, static analysis flags suspicious APIs
 - **`HeapObjectType`** is an open string union — engines can emit custom types (e.g. Python's `dict`, `tuple`)
 - **Target engine eagerly loaded** at startup in `main.tsx` via `getEngine(branding.languageId)`
-- **Python engine is a mock** — returns hardcoded snapshots regardless of input; a real engine (Pyodide, etc.) is a future task
+- **Python engine** uses `sys.settrace()` in Pyodide; baseline namespace keys are snapshotted before execution to filter builtins from variable display
 - `acorn-walk` is an unused legacy dependency — can be removed
 
 ## Deployment

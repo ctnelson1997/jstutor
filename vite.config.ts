@@ -1,6 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react-swc'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,12 +13,6 @@ export default defineConfig(({ mode }) => {
     base: '/',
     build: {
       outDir: lang === 'js' ? 'docs' : `docs-${lang}`,
-    },
-    test: {
-      // @vitejs/plugin-react (Babel) initialization races across parallel
-      // worker threads on Windows, causing intermittent "Cannot read
-      // properties of undefined (reading 'config')" failures.
-      fileParallelism: false,
     },
   };
 })
